@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RFI Extraction Template",
+  "description": "Structured output format for parsing EU CTR Validation RFI PDF documents. Field names map directly to the node/property/relationship names already deployed in the Neo4j AuraDB instance — do not rename fields without updating the graph model too.",
+  "type": "object",
+  "required": ["rfi_id", "due_date", "response_date", "submit_date", "msc", "indication", "considerations"],
+  "properties": {
+    "rfi_id": {
+      "type": "string",
+      "description": "Unique RFI identifier as printed in the document, e.g. 'CT-2024-123456-12-00-SM01-001'. Maps to RFI.rfi_id — this is the merge key for the RFI node, must be extracted exactly as printed, no reformatting."
+    },
+    "due_date": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "Maps to RFI.due_date. Format: YYYY-MM-DD. Convert from the document's dd/mm/yyyy format."
+    },
+    "response_date": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "Maps to RFI.response_date. Format: YYYY-MM-DD. Use null if the document shows no response date yet."
+    },
+    "submit_date": {
+      "type": ["string", "null"],
+      "format": "date",
+      "description": "Maps to RFI.submit_date. Format: YYYY-MM-DD."
+    },
+    "msc": {
+      "type": "object",
+      "description": "Maps to (RFI)-[:SUBMITTED_TO]->(MSC). Exactly one per RFI document.",
+      "required": ["country"],
+      "properties": {
+        "country": {
+          "type": "string",
+          "description": "The Member State Concerned as printed, e.g. 'Germany'. Maps to MSC.country — this is the merge key. Use the exact country name; do not abbreviate or translate."
+        }
+      }
+    },
+    "indication": {
+      "type": "object",
+      "description": "Maps to (RFI)-[:INDICATION_TO]->(Indication). The therapeutic indication the trial studies.",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Therapeutic indication/disease, e.g. 'Type 2 Diabetes Mellitus'. Maps to Indication.name — merge key. Use full standard naming, not abbreviations, so records referencing the same indication merge correctly."
+        }
+      }
+    },
+    "considerations": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Maps to (RFI)-[:HAS_CONSIDERATION]->(Consideration). Create ONE array entry per distinct 'Consideration number' block found in the document — do not merge multiple considerations into a single entry, and do not split one consideration across multiple entries.",
+      "items": {
+        "type": "object",
+        "required": ["number", "ctr_article", "response"],
+        "properties": {
+          "number": {
+            "type": "integer",
+            "description": "Maps to Consideration.number. Taken directly from the document's 'Consideration number' field."
+          },
+          "ctr_article": {
+            "type": "object",
+            "description": "Maps to (Consideration)-[:REFERENCES]->(CTRArticle).",
+            "required": ["name"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "The section/article/annex referenced by this specific consideration, e.g. 'Annex I, Section 63' or 'Article 6'. Maps to CTRArticle.name — merge key. If the document doesn't explicitly name an article/section for this consideration, infer the closest matching Annex I section from the 'Application section' field, but flag inferred values separately if possible."
+              }
+            }
+          },
+          "response": {
+            "type": "object",
+            "description": "Maps to (Consideration)-[:HAS_RESPONSE]->(Response).",
+            "required": ["text"],
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "The sponsor's response text for this consideration, extracted verbatim from the 'Sponsor response' field. Maps to Response.text."
+              }
+            }
+          },
+          "outcome": {
+            "type": ["object", "null"],
+            "description": "Maps to (Consideration)-[:STATUS]->(Outcome). Optional — validation-stage RFI documents typically do NOT state whether a response was accepted, so this will usually be null at extraction time and populated later from a separate follow-up document if available.",
+            "properties": {
+              "status": {
+                "type": ["string", "null"],
+                "description": "e.g. 'accepted', 'follow-up-required', 'rejected'. Maps to Outcome.status."
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
