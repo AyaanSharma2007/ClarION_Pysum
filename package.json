@@ -1,0 +1,26 @@
+{
+  "name": "rfi-nexus-data-mesh-intake",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monorepo workspace for RFI Nexus Data Mesh Intake platform",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:frontend": "npm run dev --prefix apps/frontend",
+    "dev:backend": "cd apps/backend && uvicorn main:app --reload",
+    "build:frontend": "npm run build --prefix apps/frontend",
+    "lint:frontend": "npm run lint --prefix apps/frontend"
+  },
+  "keywords": [
+    "rfi",
+    "data-mesh",
+    "intake",
+    "fastapi",
+    "react",
+    "tailwind",
+    "monorepo"
+  ],
+  "author": "",
+  "license": "MIT"
+}
