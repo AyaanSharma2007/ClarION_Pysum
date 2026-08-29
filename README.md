@@ -131,10 +131,27 @@ curl -s http://localhost:8001/rfi/<RFI_UUID>/audit | python3 -m json.tool
 
 ---
 
-## 📌 Planned Future Additions / TODO
+## 📌 Planned Future Additions & Integration Roadmap
 
-> 📝 **UI Vector Search Integration (Planned)**:
-> Currently, the search bar on the Frontend (`apps/frontend`) performs local client-side filtering. Connecting the UI directly to Layer 2's `POST /search/hybrid` endpoint for real-time vector search from the web interface is documented and planned for a future integration phase.
+### 1. UI Vector Search Integration (Frontend ↔ Layer 2)
+- **Real-Time Hybrid Search Bar**: Wire the search input in `apps/frontend/src/IngestionDashboard.tsx` to Layer 2's `POST /search/hybrid` endpoint.
+- **Rich Results Display**: Render similarity scores, matched CTR articles, and graph enrichment tags (MSC country, Indication, Louvain cluster) directly in the UI search result cards.
+
+### 2. Layer 3: Knowledge Graph & Analytics Engine (Neo4j Integration)
+- **Live Neo4j AuraDB Connection**: Configure `NEO4J_URI`, `NEO4J_USER`, and `NEO4J_PASSWORD` in the environment so Layer 2's `POST /search/hybrid` auto-populates live graph context (`msc_country`, `indication_name`, `ctr_article_name`, `louvain_cluster`, `centrality`).
+- **Automated Ingestion Trigger**: Trigger `load_rfi.py` automatically upon successful Layer 1 validation to keep Neo4j synchronized with Postgres in real time.
+- **Graph Community Analytics Pipeline**: Expose NetworkX graph analytics (`analyze_patterns.py` - Louvain communities and Hub centrality scores) via a dedicated API route in Layer 2.
+
+### 3. Layer 4: AI Regulatory Agent & Intelligence Suite
+- **Automated RFI Response Drafting**: An LLM agent (Claude 3.5 Sonnet) that uses pgvector similarity search + Neo4j historical graph context to draft compliant sponsor responses for new regulatory considerations.
+- **Compliance & Risk Scoring**: Predictive risk modeling for RFI considerations based on historical outcome statuses (`accepted`, `follow-up-required`, `rejected`).
+- **Cross-Member State Analytics Dashboard**: Visual breakdown of RFI trends, common reviewer concerns by country (MSC), and CTR article reference frequencies.
+
+### 4. Production Security & Infrastructure Readiness
+- **Supabase Auth Middleware**: Enable `AUTH_ENABLED=true` and enforce JWT token verification on Layer 2 endpoints.
+- **Managed Vector & Embedding Pipeline**: Transition local SentenceTransformers model to Voyage AI / OpenAI embedding API for production scale.
+- **CI/CD Integration**: Automated pytest suite execution and database migration checks on pull requests.
+
 
 ---
 
