@@ -1,11 +1,13 @@
 import os
 import json
+import logging
 import base64
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, UploadFile, File, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
+import httpx
 
 try:
     from apps.backend.models import RFIExtractionTemplate
@@ -21,6 +23,12 @@ router = APIRouter(tags=["Data Mesh Intake"])
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
+# Layer 2 Central Repository — pgvector + Postgres + audit trail
+# Defaults to localhost:8001 for local dev (Layer 1 uses 8000)
+LAYER2_URL = os.getenv("LAYER2_URL", "http://localhost:8001")
+
+logger = logging.getLogger(__name__)
 
 def get_supabase_client() -> Optional[Client]:
     if SUPABASE_URL and SUPABASE_KEY:
@@ -219,9 +227,41 @@ async def ingest_rfi(request: Request):
         db_status = "persisted_mock"
         db_message = "Supabase environment variables not configured. Record validated and prepared for Postgres write."
 
+    # ── Forward to Layer 2 Central Repository ──────────────────────────────
+    # Layer 2 stores the record in pgvector with per-consideration embeddings,
+    # creates a tamper-evident audit chain, and makes the record searchable
+    # via POST /search and POST /search/hybrid.
+    layer2_status = "not_forwarded"
+    layer2_message = ""
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            l2_response = await client.post(
+                f"{LAYER2_URL}/rfi",
+                json=validated_rfi.model_dump(mode="json"),
+            )
+            if l2_response.status_code in (200, 201):
+                layer2_status = "forwarded"
+                layer2_message = "Record stored in Layer 2 Central Repository (pgvector + audit chain)."
+            elif l2_response.status_code == 409:
+                layer2_status = "duplicate"
+                layer2_message = "Record already exists in Layer 2 (duplicate rfi_id)."
+            else:
+                layer2_status = "forward_error"
+                layer2_message = f"Layer 2 returned HTTP {l2_response.status_code}: {l2_response.text[:200]}"
+    except httpx.ConnectError:
+        layer2_status = "layer2_offline"
+        layer2_message = f"Layer 2 not reachable at {LAYER2_URL}. Record validated but not forwarded."
+        logger.warning("Layer 2 not reachable at %s — record not forwarded.", LAYER2_URL)
+    except Exception as l2_err:
+        layer2_status = "forward_error"
+        layer2_message = f"Layer 2 forwarding error: {str(l2_err)}"
+        logger.error("Layer 2 forwarding failed: %s", l2_err)
+
     return {
         "status": "success",
         "db_status": db_status,
         "message": db_message,
+        "layer2_status": layer2_status,
+        "layer2_message": layer2_message,
         "record": record_to_insert
     }

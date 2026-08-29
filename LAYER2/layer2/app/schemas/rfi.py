@@ -67,8 +67,10 @@ class OutcomeSchema(BaseModel):
 
 class ConsiderationCreate(BaseModel):
     number: int = Field(ge=1, description="Consideration number from the document.")
-    concern_text: str = Field(
-        description="Verbatim reviewer concern/question from the 'Consideration:' field."
+    concern_text: Optional[str] = Field(
+        default=None,
+        description="Verbatim reviewer concern/question from the 'Consideration:' field. "
+        "Optional — Layer 1 payloads may not include it (depends on extraction schema version).",
     )
     ctr_article: CTRArticleSchema
     response: ResponseSchema
