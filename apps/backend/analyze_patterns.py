@@ -18,9 +18,20 @@ import networkx as nx
 from networkx.algorithms.community import louvain_communities
 from neo4j import GraphDatabase
 
-NEO4J_URI = os.environ["NEO4J_URI"]
-NEO4J_USER = os.environ["NEO4J_USER"]
-NEO4J_PASSWORD = os.environ["NEO4J_PASSWORD"]
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+except ImportError:
+    pass
+
+NEO4J_URI = os.getenv("NEO4J_URI") or os.environ.get("NEO4J_URI")
+NEO4J_USER = os.getenv("NEO4J_USER") or os.environ.get("NEO4J_USER")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD") or os.environ.get("NEO4J_PASSWORD")
+
+if not NEO4J_URI or not NEO4J_USER or not NEO4J_PASSWORD:
+    raise RuntimeError("Missing required environment variables: NEO4J_URI, NEO4J_USER, or NEO4J_PASSWORD. Please check your .env file or environment.")
+
 
 FETCH_QUERY = """
 MATCH (a)-[r]-(b)

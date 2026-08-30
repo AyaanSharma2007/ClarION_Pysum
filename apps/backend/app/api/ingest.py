@@ -11,8 +11,13 @@ import httpx
 
 try:
     from apps.backend.models import RFIExtractionTemplate
+    from apps.backend.app.safety_gateway import screen_untrusted_text
 except ImportError:
     from models import RFIExtractionTemplate
+    try:
+        from app.safety_gateway import screen_untrusted_text
+    except ImportError:
+        from safety_gateway import screen_untrusted_text
 
 import anthropic
 from supabase import create_client, Client
@@ -154,51 +159,21 @@ Return ONLY raw valid JSON, wrapped inside a JSON code block. No explanations or
 
 
 @router.post("/ingest")
-async def ingest_rfi(request: Request):
+async def ingest_rfi(payload: RFIExtractionTemplate):
     """
     1) Validates incoming RFI JSON.
-    2) Returns detailed 400 Bad Request with field-level errors if validation fails.
-    3) Appends immutable metadata (ingested_at, owner_team, validation_status).
-    4) Writes valid records to Supabase Postgres.
+    2) Appends immutable metadata (ingested_at, owner_team, validation_status).
+    3) Prepares record for database write.
     """
-    try:
-        body_json = await request.json()
-    except Exception:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={
-                "detail": "Invalid JSON body format.",
-                "field_errors": [
-                    {
-                        "field": "body",
-                        "message": "Malformed or empty JSON payload",
-                        "type": "json_decode_error"
-                    }
-                ]
-            }
-        )
+    # Safety Gateway untrusted input boundary screen (Clarion Bible Section 6.2)
+    for c in payload.considerations:
+        text_to_screen = (c.response.text if c.response else "")
+        screen_result = screen_untrusted_text(text_to_screen)
+        if screen_result["flagged"]:
+            logger.warning(f"Safety Gateway flagged prompt injection pattern in RFI {payload.rfi_id}")
 
-    # Perform Pydantic Schema Validation
-    try:
-        validated_rfi = RFIExtractionTemplate.model_validate(body_json)
-    except ValidationError as val_error:
-        field_errors = []
-        for err in val_error.errors():
-            field_name = " -> ".join([str(loc) for loc in err["loc"]])
-            field_errors.append({
-                "field": field_name,
-                "message": err["msg"],
-                "type": err["type"],
-                "input": err.get("input")
-            })
-
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={
-                "detail": "RFI JSON Validation Failed",
-                "field_errors": field_errors
-            }
-        )
+    body_json = payload.model_dump(mode="json")
+    validated_rfi = payload
 
     # Append Immutable Metadata
     metadata = {

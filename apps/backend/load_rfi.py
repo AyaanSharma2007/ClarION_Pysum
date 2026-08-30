@@ -23,9 +23,21 @@ import sys
 import json
 from neo4j import GraphDatabase
 
-NEO4J_URI = os.environ["NEO4J_URI"]
-NEO4J_USER = os.environ["NEO4J_USER"]
-NEO4J_PASSWORD = os.environ["NEO4J_PASSWORD"]
+try:
+    # pyrefly: ignore [missing-import]
+    from dotenv import load_dotenv
+    load_dotenv()
+    load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+except ImportError:
+    pass
+
+NEO4J_URI = os.getenv("NEO4J_URI") or os.environ.get("NEO4J_URI")
+NEO4J_USER = os.getenv("NEO4J_USER") or os.environ.get("NEO4J_USER")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD") or os.environ.get("NEO4J_PASSWORD")
+
+if not NEO4J_URI or not NEO4J_USER or not NEO4J_PASSWORD:
+    raise RuntimeError("Missing required environment variables: NEO4J_URI, NEO4J_USER, or NEO4J_PASSWORD. Please check your .env file or environment.")
+
 
 MERGE_QUERY = """
 MERGE (rfi:RFI {rfi_id: $rfi_id})
@@ -64,12 +76,14 @@ def _flatten_considerations(record):
     into the flat parameter shape the Cypher UNWIND expects."""
     out = []
     for c in record["considerations"]:
+        concern = c.get("concern_text") or c.get("text") or (c.get("response") or {}).get("text", "")
+        response_text = (c.get("response") or {}).get("text") or c.get("response_text", "")
         out.append({
             "id": f'{record["rfi_id"]}-C{c["number"]}',
             "number": c["number"],
-            "concern_text": c["concern_text"],
+            "concern_text": concern,
             "ctr_article_name": c["ctr_article"]["name"],
-            "response_text": c["response"]["text"],
+            "response_text": response_text,
             "outcome_status": (c.get("outcome") or {}).get("status"),
         })
     return out
