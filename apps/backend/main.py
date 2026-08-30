@@ -5,6 +5,12 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any
 
 try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+try:
     from apps.backend.models import RFIExtractionTemplate
     from apps.backend.app.api.ingest import router as ingest_router
 except ImportError:
@@ -48,6 +54,7 @@ def health_check():
         "status": "healthy",
         "backend": "FastAPI (Pydantic v2)",
         "integrations": {
+            "gemini": bool(os.getenv("GEMINI_API_KEY")),
             "anthropic": bool(os.getenv("ANTHROPIC_API_KEY")),
             "supabase": bool(os.getenv("SUPABASE_URL"))
         }

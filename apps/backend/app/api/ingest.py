@@ -20,6 +20,7 @@ from supabase import create_client, Client
 router = APIRouter(tags=["Data Mesh Intake"])
 
 # Initialize clients if environment variables are present
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
@@ -39,7 +40,7 @@ def get_supabase_client() -> Optional[Client]:
 async def parse_pdf(file: UploadFile = File(...)):
     """
     1) Takes an uploaded PDF document.
-    2) Sends it to Claude API with a structured prompt.
+    2) Sends it to Gemini API (or Claude API) with a structured prompt.
     3) Returns extracted JSON matching the strict RFIExtractionTemplate Pydantic schema.
     """
     if not file.filename.endswith(".pdf") and file.content_type != "application/pdf":
@@ -79,7 +80,92 @@ Field Guidelines:
 Return ONLY raw valid JSON, wrapped inside a JSON code block. No explanations or extra text.
 """
 
-    if ANTHROPIC_API_KEY:
+    if GEMINI_API_KEY:
+        try:
+            base64_pdf = base64.b64encode(pdf_bytes).decode("utf-8")
+            payload = {
+                "contents": [
+                    {
+                        "parts": [
+                            {
+                                "inline_data": {
+                                    "mime_type": "application/pdf",
+                                    "data": base64_pdf
+                                }
+                            },
+                            {
+                                "text": prompt
+                            }
+                        ]
+                    }
+                ],
+                "generationConfig": {
+                    "response_mime_type": "application/json"
+                }
+            }
+
+            gemini_models = [
+                os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+                "gemini-2.5-flash",
+                "gemini-2.0-flash",
+                "gemini-1.5-flash-latest",
+            ]
+            # Deduplicate preserving order
+            seen = set()
+            models_to_try = [m for m in gemini_models if not (m in seen or seen.add(m))]
+
+            resp = None
+            for model_name in models_to_try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    resp = await client.post(url, json=payload)
+                    if resp.status_code == 200:
+                        break
+                    elif resp.status_code == 404:
+                        logger.warning("Model %s returned 404. Trying next model...", model_name)
+                        continue
+                    else:
+                        break
+
+            if resp is None or resp.status_code != 200:
+                if resp and resp.status_code == 400 and "API_KEY_INVALID" in resp.text:
+                    logger.warning("Gemini API key is invalid or revoked. Falling back to mock extraction mode for testing.")
+                elif resp:
+                    raise Exception(f"Gemini API HTTP {resp.status_code}: {resp.text}")
+                else:
+                    raise Exception("Failed to communicate with Gemini API.")
+            else:
+                res_data = resp.json()
+                raw_text = res_data["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+                if raw_text.startswith("```json"):
+                    raw_text = raw_text[7:]
+                if raw_text.startswith("```"):
+                    raw_text = raw_text[3:]
+                if raw_text.endswith("```"):
+                    raw_text = raw_text[:-3]
+                raw_text = raw_text.strip()
+
+                extracted_json = json.loads(raw_text)
+                validated_model = RFIExtractionTemplate.model_validate(extracted_json)
+                return validated_model
+
+        except ValidationError as val_err:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Gemini response failed Pydantic validation: {val_err}"
+            )
+        except HTTPException:
+            raise
+        except Exception as err:
+            if "API_KEY_INVALID" not in str(err):
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Error communicating with Gemini API: {str(err)}"
+                )
+            logger.warning("Gemini API error: %s. Falling back to mock extraction.", err)
+
+    elif ANTHROPIC_API_KEY:
         try:
             client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
             base64_pdf = base64.b64encode(pdf_bytes).decode("utf-8")

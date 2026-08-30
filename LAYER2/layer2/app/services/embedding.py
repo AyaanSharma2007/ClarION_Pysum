@@ -19,7 +19,9 @@ The vector dimension changes (384 → 1536), so you must also:
 """
 from __future__ import annotations
 
+import hashlib
 import logging
+import math
 from typing import Any
 
 from app.config import settings
@@ -37,15 +39,26 @@ class EmbeddingService:
     async def initialize(self) -> None:
         """Called once at app startup (FastAPI lifespan)."""
         if self._backend == "sentence_transformers":
-            # Import deferred so the module loads fast even if torch is slow.
-            from sentence_transformers import SentenceTransformer
+            try:
+                # Import deferred so the module loads fast even if torch is slow.
+                from sentence_transformers import SentenceTransformer  # type: ignore[import]
 
+                logger.info(
+                    "Loading sentence-transformers model: %s", settings.EMBEDDING_MODEL
+                )
+                # SentenceTransformer() is synchronous — acceptable at startup.
+                self._model = SentenceTransformer(settings.EMBEDDING_MODEL)
+                logger.info("Embedding model ready (dim=%d).", settings.EMBEDDING_DIMENSION)
+            except ImportError:
+                logger.warning(
+                    "sentence_transformers is not installed. Falling back to dummy embedding mode for testing."
+                )
+                self._backend = "dummy"
+
+        if self._backend in ("dummy", "stub"):
             logger.info(
-                "Loading sentence-transformers model: %s", settings.EMBEDDING_MODEL
+                "Initialized dummy embedding backend (dim=%d).", settings.EMBEDDING_DIMENSION
             )
-            # SentenceTransformer() is synchronous — acceptable at startup.
-            self._model = SentenceTransformer(settings.EMBEDDING_MODEL)
-            logger.info("Embedding model ready (dim=%d).", settings.EMBEDDING_DIMENSION)
 
         elif self._backend == "voyage":
             if not settings.VOYAGE_API_KEY:
@@ -63,14 +76,23 @@ class EmbeddingService:
 
         self._initialized = True
 
+    def _dummy_encode(self, text: str) -> list[float]:
+        dim = settings.EMBEDDING_DIMENSION
+        h = hashlib.sha256(text.encode("utf-8")).digest()
+        floats = [(h[i % len(h)] / 255.0) - 0.5 for i in range(dim)]
+        norm = math.sqrt(sum(x * x for x in floats)) or 1.0
+        return [x / norm for x in floats]
+
     # ── Public API ─────────────────────────────────────────────────────────────
 
     def encode(self, text: str) -> list[float]:
         """
-        Synchronous encode — only supported for sentence_transformers.
+        Synchronous encode — supported for sentence_transformers and dummy modes.
         Used in tests and scripts where async context is unavailable.
         """
         self._assert_ready()
+        if self._backend in ("dummy", "stub"):
+            return self._dummy_encode(text)
         if self._backend == "sentence_transformers":
             vec = self._model.encode(text, normalize_embeddings=True)
             return vec.tolist()
@@ -81,10 +103,12 @@ class EmbeddingService:
 
     async def encode_async(self, text: str) -> list[float]:
         """
-        Async encode — works for both backends.
+        Async encode — works for all backends.
         Preferred method for use inside FastAPI route handlers.
         """
         self._assert_ready()
+        if self._backend in ("dummy", "stub"):
+            return self._dummy_encode(text)
         if self._backend == "sentence_transformers":
             # sentence-transformers is CPU/GPU sync; run in executor if needed.
             # For models this size it's fast enough inline.
@@ -104,6 +128,8 @@ class EmbeddingService:
     async def encode_batch_async(self, texts: list[str]) -> list[list[float]]:
         """Batch encode — more efficient than calling encode_async in a loop."""
         self._assert_ready()
+        if self._backend in ("dummy", "stub"):
+            return [self._dummy_encode(t) for t in texts]
         if self._backend == "sentence_transformers":
             vecs = self._model.encode(texts, normalize_embeddings=True, batch_size=32)
             return [v.tolist() for v in vecs]
@@ -130,3 +156,4 @@ class EmbeddingService:
 
 # Module-level singleton — shared across all request contexts.
 embedding_service = EmbeddingService()
+

@@ -24,7 +24,7 @@ class Settings(BaseSettings):
         )
 
     # ── Embeddings ────────────────────────────────────────────────────────────
-    EMBEDDING_BACKEND: Literal["sentence_transformers", "voyage"] = (
+    EMBEDDING_BACKEND: Literal["sentence_transformers", "voyage", "dummy", "stub"] = (
         "sentence_transformers"
     )
     EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
