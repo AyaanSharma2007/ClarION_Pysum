@@ -73,7 +73,60 @@ class ExtractionService:
         if self._backend == "claude":
             return await self._extract_via_claude(rfi_text)
 
+        if self._backend == "ollama" or self._backend == "local":
+            return await self._extract_via_ollama(rfi_text)
+
         raise ValueError(f"Unknown EXTRACTION_BACKEND: {self._backend!r}")
+
+    async def _extract_via_ollama(self, rfi_text: str) -> ExtractionResult:
+        """
+        Call local Ollama endpoint (Llama 3.1 / Qwen2.5) to classify RFI text into JSON.
+        Reachable when EXTRACTION_BACKEND=ollama or EXTRACTION_BACKEND=local.
+        """
+        import httpx
+
+        ollama_url = getattr(settings, "OLLAMA_HOST", "http://localhost:11434")
+        ollama_model = getattr(settings, "OLLAMA_MODEL", "llama3.1")
+
+        logger.info("🤖 Routing RFI text to local Llama 3.1 via Ollama (%s, model=%s)...", ollama_url, ollama_model)
+
+        categories_str = " | ".join(self.VALID_CATEGORIES)
+        prompt = (
+            f"You are an EU CTR regulatory specialist.\n"
+            f"Classify the following RFI text into exactly one category "
+            f"from this list: {categories_str}.\n\n"
+            f"RFI Text:\n{rfi_text[:3000]}\n\n"
+            f'Respond with valid JSON only: {{"category": "<category>"}}'
+        )
+
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                res = await client.post(
+                    f"{ollama_url}/api/generate",
+                    json={
+                        "model": ollama_model,
+                        "prompt": prompt,
+                        "format": "json",
+                        "stream": False,
+                    },
+                )
+                if res.status_code == 200:
+                    response_json = res.json()
+                    response_text = response_json.get("response", "{}")
+                    data = json.loads(response_text)
+                    category = data.get("category")
+                    if category not in self.VALID_CATEGORIES:
+                        category = "Other"
+                    logger.info("✅ Llama 3.1 successfully extracted category: %r", category)
+                    return ExtractionResult(category=category)
+                else:
+                    logger.error("Ollama HTTP %d: %s", res.status_code, res.text)
+        except Exception as exc:
+            logger.error("Failed to connect or parse Ollama response: %s", exc)
+
+        return ExtractionResult(category="Other")
+
+
 
     async def _extract_via_claude(self, rfi_text: str) -> ExtractionResult:
         """

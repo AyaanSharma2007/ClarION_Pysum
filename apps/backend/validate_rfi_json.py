@@ -61,7 +61,10 @@ def check_naming_consistency(records):
 
 def main(json_folder, schema_path=DEFAULT_SCHEMA):
     schema = load_schema(schema_path)
-    files = [os.path.join(json_folder, f) for f in os.listdir(json_folder) if f.endswith(".json")]
+    if os.path.isfile(json_folder):
+        files = [json_folder]
+    else:
+        files = [os.path.join(json_folder, f) for f in os.listdir(json_folder) if f.endswith(".json")]
 
     valid_records = []
     errors = []
