@@ -1,23 +1,56 @@
-import React, { useState, useRef, useCallback } from 'react'
-import axios from 'axios'
-import {
-  Database,
-  Upload,
-  FileText,
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
-  Send,
-  ArrowRight,
-  RotateCcw,
-  Layers,
-  LayoutDashboard,
-  ChevronDown,
-  ChevronUp,
-  Shield,
-  Zap,
-} from 'lucide-react'
-import IngestionDashboard from './IngestionDashboard'
+import React, { useState, useEffect } from 'react';
+import Header from './components/Header';
+import RaClinicalView from './components/RaClinicalView';
+import CtaOpsView from './components/CtaOpsView';
+import MedicalWritingView from './components/MedicalWritingView';
+import ExecutiveView from './components/ExecutiveView';
+import GuidedDemoModal from './components/GuidedDemoModal';
+import { checkSystemHealth } from './services/api';
+
+const RFIS = [
+  {
+    rfi_uuid: 'CT-2026-QWEN-TEST-001',
+    rfi_id: 'CT-2026-QWEN-TEST-001',
+    msc_country: 'Denmark',
+    indication_name: 'Immunology',
+    category: 'IMPD Safety',
+    stage: 'RA_Clinical_Review',
+    sla_status: 'ACTIVE',
+    due_date: new Date(Date.now() + 48 * 3600 * 1000).toISOString(),
+    considerations: [{
+      ctr_article: { name: 'Annex I, Section 63' },
+      response: { text: 'IMPD Section 2.1 safety documentation and toxicological assay reporting updated.' },
+    }],
+  },
+  {
+    rfi_uuid: 'CT-2024-884920-14-DE-001',
+    rfi_id: 'CT-2024-884920-14-DE-001',
+    msc_country: 'Germany',
+    indication_name: 'Type 2 Diabetes',
+    category: 'Statistics',
+    stage: 'Received',
+    sla_status: 'ACTIVE',
+    due_date: new Date(Date.now() + 30 * 3600 * 1000).toISOString(),
+    considerations: [{
+      ctr_article: { name: 'Part I – Regulatory / Annex I, Section 63' },
+      response: { text: 'Statistical power calculation and sample size justification section 4.2 updated.' },
+    }],
+  },
+  {
+    rfi_uuid: 'CT-2024-991204-09-FR-002',
+    rfi_id: 'CT-2024-991204-09-FR-002',
+    msc_country: 'France',
+    indication_name: 'Oncology',
+    category: 'Protocol Design',
+    stage: 'CTA_Mgmt_Review',
+    sla_status: 'ACTIVE',
+    due_date: new Date(Date.now() + 12 * 3600 * 1000).toISOString(),
+    considerations: [{
+      ctr_article: { name: 'Annex I, Section 12 – IMP Quality' },
+      response: { text: 'Batch release specification and dosage regimen details updated.' },
+    }],
+  },
+];
 
 // ── Pipeline step indicator ────────────────────────────────────────────────────
 const STEPS = ['Upload PDF', 'Review Extraction', 'Forward to Layer 2']
@@ -279,175 +312,36 @@ function ReviewPanel({ extracted, filename, onConfirm, onReset, forwarding, forw
 
 // ── Main app ──────────────────────────────────────────────────────────────────
 export default function App() {
-  const [activeTab, setActiveTab] = useState('intake')
+  const [role, setRole] = useState('ra_clinical');
+  const [health, setHealth] = useState({ layer1: false, layer2: false, ollama: false });
+  const [showDemo, setShowDemo] = useState(false);
 
-  // Intake flow state
-  const [step, setStep]               = useState(0)   // 0 upload, 1 review, 2 done
-  const [uploading, setUploading]     = useState(false)
-  const [uploadError, setUploadError] = useState(null)
-  const [extracted, setExtracted]     = useState(null)
-  const [filename, setFilename]       = useState('')
-  const [forwarding, setForwarding]   = useState(false)
-  const [forwardResult, setForwardResult] = useState(null)
-
-  const handleFile = async (file) => {
-    setUploading(true)
-    setUploadError(null)
-    setFilename(file.name)
-
-    const form = new FormData()
-    form.append('file', file)
-
-    try {
-      const res = await axios.post('http://localhost:8000/parse-pdf', form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-      setExtracted(res.data)
-      setStep(1)
-    } catch (err) {
-      const detail =
-        err.response?.data?.detail ||
-        err.message ||
-        'PDF extraction failed. Check that the backend is running.'
-      setUploadError(detail)
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  const handleForward = async () => {
-    setForwarding(true)
-    try {
-      const res = await axios.post('http://localhost:8000/ingest', extracted)
-      const data = res.data
-      setForwardResult({
-        ok: true,
-        message: data.message || data.layer2_message || 'Record stored in Layer 2.',
-        layer2Status: data.layer2_status,
-      })
-      setStep(2)
-    } catch (err) {
-      const detail = err.response?.data?.detail || err.message || 'Forwarding failed.'
-      setForwardResult({ ok: false, message: detail })
-    } finally {
-      setForwarding(false)
-    }
-  }
-
-  const handleReset = () => {
-    setStep(0)
-    setExtracted(null)
-    setFilename('')
-    setUploadError(null)
-    setForwardResult(null)
-  }
+  useEffect(() => {
+    const poll = async () => setHealth(await checkSystemHealth());
+    poll();
+    const t = setInterval(poll, 10000);
+    return () => clearInterval(t);
+  }, []);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* ── Header ── */}
-      <header className="border-b border-slate-800 bg-slate-900/60 backdrop-blur px-6 py-4 sticky top-0 z-50">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-600/20 text-blue-400 rounded-xl border border-blue-500/30">
-              <Database className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold tracking-tight text-white leading-none">RFI Nexus</h1>
-              <p className="text-[11px] text-slate-500 mt-0.5">EU CTR Validation Platform</p>
-            </div>
-          </div>
+    <div style={{ minHeight: '100vh', background: '#0a0a0a', display: 'flex', flexDirection: 'column' }}>
+      <Header
+        activeRole={role}
+        setActiveRole={setRole}
+        systemHealth={health}
+        onOpenDemo={() => setShowDemo(true)}
+      />
 
-          <nav className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
-            <button
-              id="tab-intake"
-              onClick={() => setActiveTab('intake')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                activeTab === 'intake'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              Intake
-            </button>
-            <button
-              id="tab-dashboard"
-              onClick={() => setActiveTab('dashboard')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                activeTab === 'dashboard'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <LayoutDashboard className="w-3.5 h-3.5" />
-              Dashboard
-            </button>
-          </nav>
-
-          <div className="hidden sm:flex items-center gap-2 text-xs text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            Layer 1 Active
-          </div>
-        </div>
-      </header>
-
-      {/* ── Main ── */}
-      <main className="flex-1 max-w-4xl w-full mx-auto px-6 py-10">
-        {activeTab === 'dashboard' ? (
-          <IngestionDashboard />
-        ) : (
-          <>
-            {/* Page title */}
-            <div className="text-center mb-10">
-              <h2 className="text-2xl font-bold text-white mb-2">RFI Document Intake</h2>
-              <p className="text-sm text-slate-400 max-w-md mx-auto">
-                Upload an EU CTR validation RFI PDF. Claude extracts the structured data,
-                you review it, then it's forwarded to the Layer 2 central repository.
-              </p>
-            </div>
-
-            <StepIndicator current={step === 2 ? 2 : step} />
-
-            <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-8 backdrop-blur">
-              {step === 0 && (
-                <div className="space-y-4">
-                  <DropZone onFile={handleFile} loading={uploading} />
-                  {uploadError && (
-                    <div className="flex items-start gap-3 px-4 py-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-300 text-sm">
-                      <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                      <span>{uploadError}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {(step === 1 || step === 2) && extracted && (
-                <ReviewPanel
-                  extracted={extracted}
-                  filename={filename}
-                  onConfirm={handleForward}
-                  onReset={handleReset}
-                  forwarding={forwarding}
-                  forwardResult={forwardResult}
-                />
-              )}
-            </div>
-
-            {/* Flow footnote */}
-            <div className="mt-6 flex items-center justify-center gap-6 text-xs text-slate-600">
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-blue-500/60" />
-                Layer 1 — Data Mesh Intake (port 8000)
-              </span>
-              <ArrowRight className="w-3 h-3" />
-              <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-purple-500/60" />
-                Layer 2 — Central Repository (port 8001)
-              </span>
-            </div>
-          </>
-        )}
+      <main style={{ flex: 1, maxWidth: 1280, width: '100%', margin: '0 auto', padding: '0 24px' }}>
+        {role === 'ra_clinical'     && <RaClinicalView rfis={RFIS} onRefresh={() => {}} />}
+        {role === 'cta_ops'         && <CtaOpsView onRefresh={() => {}} />}
+        {role === 'medical_writing' && <MedicalWritingView />}
+        {role === 'executive'       && <ExecutiveView rfis={RFIS} />}
       </main>
+
+      {showDemo && (
+        <GuidedDemoModal onClose={() => setShowDemo(false)} setActiveRole={setRole} />
+      )}
     </div>
-  )
+  );
 }

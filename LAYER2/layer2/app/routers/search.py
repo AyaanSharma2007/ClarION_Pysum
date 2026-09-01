@@ -159,7 +159,7 @@ async def search_rfis(
 
 
 @router.get(
-    "/rfi/{rfi_uuid}/similar",
+    "/rfi/{rfi_identifier}/similar",
     response_model=SearchResponse,
     summary="Find RFIs semantically similar to a given record",
     description=(
@@ -169,19 +169,22 @@ async def search_rfis(
     ),
 )
 async def get_similar(
-    rfi_uuid: uuid.UUID,
+    rfi_identifier: str,
     top_k: int = 10,
     db: AsyncSession = Depends(get_db),
 ):
-    # Fetch source RFI embedding
-    result = await db.execute(
-        select(RFI.embedding, RFI.rfi_text).where(RFI.id == rfi_uuid)
-    )
+    try:
+        u = uuid.UUID(rfi_identifier)
+        stmt_src = select(RFI.id, RFI.embedding, RFI.rfi_text).where((RFI.id == u) | (RFI.rfi_id == rfi_identifier))
+    except (ValueError, TypeError, AttributeError):
+        stmt_src = select(RFI.id, RFI.embedding, RFI.rfi_text).where(RFI.rfi_id == rfi_identifier)
+
+    result = await db.execute(stmt_src)
     row = result.one_or_none()
     if row is None:
         raise HTTPException(status_code=404, detail="RFI not found.")
 
-    embedding, rfi_text = row
+    target_id, embedding, rfi_text = row
     if embedding is None:
         raise HTTPException(
             status_code=422,
@@ -199,7 +202,7 @@ async def get_similar(
     stmt = (
         select(RFI, (literal(1) - distance_expr).label("score"))
         .where(RFI.embedding.is_not(None))
-        .where(RFI.id != rfi_uuid)  # exclude self
+        .where(RFI.id != target_id)  # exclude self
         .options(*_load_options())
         .order_by(distance_expr)
         .limit(top_k)
@@ -220,6 +223,7 @@ async def get_similar(
         total=len(results),
         query=rfi_text or "",
     )
+
 
 
 # ─── Hybrid search ───────────────────────────────────────────────────────────────
