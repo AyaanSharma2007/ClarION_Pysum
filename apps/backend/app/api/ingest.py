@@ -43,7 +43,8 @@ async def parse_pdf(file: UploadFile = File(...)):
     2) Sends it to Gemini API (or Claude API) with a structured prompt.
     3) Returns extracted JSON matching the strict RFIExtractionTemplate Pydantic schema.
     """
-    if not file.filename.endswith(".pdf") and file.content_type != "application/pdf":
+    filename = file.filename or ""
+    if not filename.endswith(".pdf") and file.content_type != "application/pdf":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="File must be a valid PDF document."
@@ -105,10 +106,10 @@ Return ONLY raw valid JSON, wrapped inside a JSON code block. No explanations or
             }
 
             gemini_models = [
-                os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-                "gemini-2.5-flash",
-                "gemini-2.0-flash",
-                "gemini-1.5-flash-latest",
+                os.getenv("GEMINI_MODEL", "gemini-3.7-flash"),
+                "gemini-3.7-flash",
+                "gemini-3.6-flash",
+                "gemini-3.5-flash-lite",
             ]
             # Deduplicate preserving order
             seen = set()
@@ -194,7 +195,14 @@ Return ONLY raw valid JSON, wrapped inside a JSON code block. No explanations or
                 ]
             )
 
-            raw_text = message.content[0].text.strip()
+            text_blocks = [
+                getattr(block, "text", "") 
+                for block in message.content 
+                if getattr(block, "type", None) == "text" and hasattr(block, "text")
+            ]
+            if not text_blocks:
+                raise Exception("No text block returned from Anthropic Claude response.")
+            raw_text = text_blocks[0].strip()
             # Clean markdown codeblocks if present
             if raw_text.startswith("```json"):
                 raw_text = raw_text[7:]

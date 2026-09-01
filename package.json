@@ -8,8 +8,8 @@
   ],
   "scripts": {
     "dev:frontend": "npm run dev --prefix apps/frontend",
-    "dev:backend": "cd apps/backend && uvicorn main:app --reload",
-    "dev:layer2": "cd LAYER2/layer2 && uvicorn app.main:app --reload --port 8001",
+    "dev:backend": "cd apps/backend && ./venv/bin/uvicorn main:app --reload",
+    "dev:layer2": "cd LAYER2/layer2 && ../../apps/backend/venv/bin/uvicorn app.main:app --reload --port 8001",
     "build:frontend": "npm run build --prefix apps/frontend",
     "lint:frontend": "npm run lint --prefix apps/frontend"
   },
