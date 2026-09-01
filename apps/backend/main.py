@@ -13,9 +13,11 @@ except ImportError:
 try:
     from apps.backend.models import RFIExtractionTemplate
     from apps.backend.app.api.ingest import router as ingest_router
+    from apps.backend.app.api.risk_router import router as risk_router
 except ImportError:
     from models import RFIExtractionTemplate
     from app.api.ingest import router as ingest_router
+    from app.api.risk_router import router as risk_router
 
 app = FastAPI(
     title="EU CTR RFI Data Mesh Intake API",
@@ -31,8 +33,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include Ingest API Router
+# Include Ingest API Router (Layer 1)
 app.include_router(ingest_router)
+
+# Include Risk Prediction Router (Layer 4 — Risk Engine, Clarion Bible §9)
+app.include_router(risk_router)
 
 class RFIResponse(BaseModel):
     id: str
@@ -45,7 +50,7 @@ def read_root():
     return {
         "service": "EU CTR RFI Data Mesh Intake API",
         "status": "online",
-        "layer": "Layer 1 (Data Mesh Intake)"
+        "layers": "Layer 1 (Data Mesh Intake), Layer 4 (Risk Prediction Engine)"
     }
 
 @app.get("/api/health")
