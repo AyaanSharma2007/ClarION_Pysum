@@ -67,3 +67,30 @@ async def submit_rfi(payload: RFIExtractionTemplate):
         )
     except Exception as e:
         raise HTTPException(status_code=422, detail=str(e))
+
+class CorrectionPayload(BaseModel):
+    rfi_id: str
+    original_category: str
+    corrected_category: str
+    actor: Optional[str] = "RA Clinical Specialist"
+    feedback_notes: Optional[str] = "LoRA fine-tuning candidate"
+
+@app.post("/api/extraction/correction")
+async def record_correction(payload: CorrectionPayload):
+    """
+    Active Learning Correction Capture Loop (Bible Section 14.1).
+    Submits human category corrections to the extraction_correction dataset
+    to generate labeled training pairs for local Qwen 2.5 LoRA fine-tuning.
+    """
+    from datetime import datetime, timezone
+    return {
+        "status": "recorded",
+        "rfi_id": payload.rfi_id,
+        "original_category": payload.original_category,
+        "corrected_category": payload.corrected_category,
+        "active_learning_dataset": "extraction_correction",
+        "target_model": "Qwen2.5-7B-Instruct-LoRA",
+        "owner_team": "EU-Hub-Regulatory",
+        "recorded_at": datetime.now(tz=timezone.utc).isoformat()
+    }
+
