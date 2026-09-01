@@ -72,6 +72,7 @@ const S = {
 const TABS = [
   { id: 'ra_clinical',     label: 'Clinical Queue' },
   { id: 'cta_ops',         label: 'Intake' },
+  { id: 'risk_engine',     label: 'Risk Engine' },
   { id: 'medical_writing', label: 'Search' },
   { id: 'executive',       label: 'Audit' },
 ];

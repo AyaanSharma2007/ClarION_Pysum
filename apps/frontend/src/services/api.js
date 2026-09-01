@@ -168,3 +168,21 @@ export const submitCategoryCorrection = async (
   }
 };
 
+// Layer 4 Risk Prediction Engine API calls (Clarion Bible §9)
+export const predictDossierRisk = async (dossierFeatures) => {
+  try {
+    const res = await axios.post(`${LAYER1_URL}/api/risk/predict`, dossierFeatures);
+    return res.data;
+  } catch (err) {
+    throw err.response?.data || err;
+  }
+};
+
+export const getRiskFeatureSchema = async () => {
+  try {
+    const res = await axios.get(`${LAYER1_URL}/api/risk/features`);
+    return res.data;
+  } catch (err) {
+    throw err.response?.data || err;
+  }
+};

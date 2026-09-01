@@ -3,6 +3,7 @@ import Header from './components/Header';
 import RaClinicalView from './components/RaClinicalView';
 import CtaOpsView from './components/CtaOpsView';
 import MedicalWritingView from './components/MedicalWritingView';
+import RiskPredictorView from './components/RiskPredictorView';
 import ExecutiveView from './components/ExecutiveView';
 import GuidedDemoModal from './components/GuidedDemoModal';
 import { checkSystemHealth } from './services/api';
@@ -335,6 +336,7 @@ export default function App() {
       <main style={{ flex: 1, maxWidth: 1280, width: '100%', margin: '0 auto', padding: '0 24px' }}>
         {role === 'ra_clinical'     && <RaClinicalView rfis={RFIS} onRefresh={() => {}} />}
         {role === 'cta_ops'         && <CtaOpsView onRefresh={() => {}} />}
+        {role === 'risk_engine'     && <RiskPredictorView />}
         {role === 'medical_writing' && <MedicalWritingView />}
         {role === 'executive'       && <ExecutiveView rfis={RFIS} />}
       </main>
