@@ -14,7 +14,11 @@ import copy
 import pytest
 from httpx import AsyncClient
 
+<<<<<<< HEAD
 from LAYER2.layer2.tests.conftest import SAMPLE_RFI
+=======
+from tests.conftest import SAMPLE_RFI
+>>>>>>> main
 
 
 @pytest.mark.asyncio

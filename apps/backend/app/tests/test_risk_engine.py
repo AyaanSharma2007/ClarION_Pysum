@@ -35,7 +35,11 @@ _BACKEND_ROOT = Path(__file__).parent.parent.parent.resolve()
 if str(_BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(_BACKEND_ROOT))
 
+<<<<<<< HEAD
 from apps.backend.app.api.risk_engine import (
+=======
+from app.api.risk_engine import (
+>>>>>>> main
     FEATURE_NAMES,
     RFI_CATEGORIES,
     DossierFeatureVector,

@@ -10,12 +10,23 @@ try:
 except ImportError:
     pass
 
+<<<<<<< HEAD
 from apps.backend.app.api.ingest import router as ingest_router
 from apps.backend.app.api.risk_router import router as risk_router
 from apps.backend.app.api.governance import router as governance_router
 from apps.backend.app.api.rfi import router as rfi_router
 from apps.backend.app.api.intelligence import router as intelligence_router
 from apps.backend.models import RFIExtractionTemplate
+=======
+try:
+    from apps.backend.models import RFIExtractionTemplate
+    from apps.backend.app.api.ingest import router as ingest_router
+    from apps.backend.app.api.risk_router import router as risk_router
+except ImportError:
+    from models import RFIExtractionTemplate
+    from app.api.ingest import router as ingest_router
+    from app.api.risk_router import router as risk_router
+>>>>>>> main
 
 app = FastAPI(
     title="EU CTR RFI Data Mesh Intake API",
@@ -37,6 +48,7 @@ app.include_router(ingest_router)
 # Include Risk Prediction Router (Layer 4 — Risk Engine, Clarion Bible §9)
 app.include_router(risk_router)
 
+<<<<<<< HEAD
 # Include Governance Router (Layer 6)
 app.include_router(governance_router)
 
@@ -46,6 +58,8 @@ app.include_router(rfi_router)
 # Include Intelligence Router (Layers 3 & 5)
 app.include_router(intelligence_router)
 
+=======
+>>>>>>> main
 class RFIResponse(BaseModel):
     id: str
     status: str

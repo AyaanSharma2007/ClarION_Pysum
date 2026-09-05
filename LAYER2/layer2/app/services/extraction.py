@@ -17,7 +17,11 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 
+<<<<<<< HEAD
 from LAYER2.layer2.app.config import settings
+=======
+from app.config import settings
+>>>>>>> main
 
 logger = logging.getLogger(__name__)
 

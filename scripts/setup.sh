@@ -23,6 +23,7 @@ echo "📦 Checking npm dependencies..."
 npm install --quiet
 npm install --prefix apps/frontend --quiet
 
+<<<<<<< HEAD
 # 4. Initialize Database Schema
 echo "🗄️ Initializing Database schema..."
 if [ -f "LAYER2/layer2/.env" ]; then
@@ -32,6 +33,8 @@ else
     echo "⚠️ LAYER2/layer2/.env not found, skipping database migrations."
 fi
 
+=======
+>>>>>>> main
 echo "======================================================="
 echo " 🎉 Setup Complete! You can now run:"
 echo "   - npm run dev           (starts Layer 2, Backend, & Frontend)"

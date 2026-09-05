@@ -22,10 +22,17 @@ import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
+<<<<<<< HEAD
 from LAYER2.layer2.app.main import app
 from LAYER2.layer2.app.database import Base, get_db
 from LAYER2.layer2.app.config import settings
 from LAYER2.layer2.app.services.embedding import embedding_service
+=======
+from app.main import app
+from app.database import Base, get_db
+from app.config import settings
+from app.services.embedding import embedding_service
+>>>>>>> main
 
 # ── DB URL ─────────────────────────────────────────────────────────────────────
 

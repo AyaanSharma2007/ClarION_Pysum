@@ -13,6 +13,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
+<<<<<<< HEAD
 # ─── Valid workflow stages (Bible §6.4 / §7 status enum) ──────────────────────
 
 VALID_STAGES: list[str] = [
@@ -23,6 +24,18 @@ VALID_STAGES: list[str] = [
     "pending_approval",
     "approved",
     "submitted",
+=======
+# ─── Valid workflow stages (§4.4 state diagram) ────────────────────────────────
+
+VALID_STAGES: list[str] = [
+    "Received",
+    "Categorized",
+    "RA_Clinical_Review",
+    "Affiliate_Review",
+    "CTA_Mgmt_Review",
+    "EU_Hub_Approval",
+    "Submitted",
+>>>>>>> main
 ]
 
 # ─── Sub-objects matching rfi_extraction_schema.json ──────────────────────────
@@ -87,6 +100,7 @@ class RFICreate(BaseModel):
     rfi_id: str = Field(
         description="Unique identifier as printed, e.g. 'CT-2024-123456-12-00-SM01-001'."
     )
+<<<<<<< HEAD
     # Bible §7 — RFI type and source document reference
     rfi_type: Optional[str] = Field(
         default=None,
@@ -96,6 +110,8 @@ class RFICreate(BaseModel):
         default=None,
         description="Reference to original PDF/source document — Evidence Integrity 'Original' dimension.",
     )
+=======
+>>>>>>> main
     due_date: Optional[date] = None
     response_date: Optional[date] = None
     submit_date: Optional[date] = None
@@ -118,13 +134,19 @@ class RFIBatchCreate(BaseModel):
 class ConsiderationRead(BaseModel):
     id: uuid.UUID
     number: int
+<<<<<<< HEAD
     consideration_id_str: Optional[str] = None
+=======
+>>>>>>> main
     concern_text: Optional[str] = None
     ctr_article_name: Optional[str] = None
     response_text: Optional[str] = None
     outcome_status: Optional[str] = None
+<<<<<<< HEAD
     cluster_id: Optional[int] = None
     is_hub_article: Optional[bool] = None
+=======
+>>>>>>> main
 
     model_config = {"from_attributes": True}
 
@@ -133,8 +155,11 @@ class WorkflowStateRead(BaseModel):
     current_stage: str
     stage_entered_at: datetime
     sla_due_at: Optional[datetime] = None
+<<<<<<< HEAD
     approved_by: Optional[str] = None
     approved_at: Optional[datetime] = None
+=======
+>>>>>>> main
 
     model_config = {"from_attributes": True}
 
@@ -142,9 +167,12 @@ class WorkflowStateRead(BaseModel):
 class RFIRead(BaseModel):
     id: uuid.UUID
     rfi_id: str
+<<<<<<< HEAD
     rfi_type: Optional[str] = None
     status: Optional[str] = None
     source_document_ref: Optional[str] = None
+=======
+>>>>>>> main
     due_date: Optional[date] = None
     response_date: Optional[date] = None
     submit_date: Optional[date] = None

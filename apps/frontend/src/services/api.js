@@ -1,7 +1,11 @@
 import axios from 'axios';
 
 const LAYER1_URL = 'http://localhost:8000';
+<<<<<<< HEAD
 const LAYER2_URL = 'http://localhost:8000';
+=======
+const LAYER2_URL = 'http://localhost:8001';
+>>>>>>> main
 const OLLAMA_URL = 'http://localhost:11434';
 
 export const checkSystemHealth = async () => {
@@ -19,7 +23,11 @@ export const checkSystemHealth = async () => {
   }
 
   try {
+<<<<<<< HEAD
     const l2Res = await axios.get(`${LAYER2_URL}/api/health`, { timeout: 3000 });
+=======
+    const l2Res = await axios.get(`${LAYER2_URL}/health`, { timeout: 3000 });
+>>>>>>> main
     results.layer2 = l2Res.status === 200;
   } catch (e) {
     results.layer2 = false;

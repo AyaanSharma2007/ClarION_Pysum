@@ -19,6 +19,7 @@ config = context.config
 db_url = os.environ.get("DATABASE_URL", "")
 # Alembic needs a sync driver — swap asyncpg → psycopg
 sync_url = db_url.replace("postgresql+asyncpg://", "postgresql+psycopg://")
+<<<<<<< HEAD
 # Strip asyncpg-specific query parameters that psycopg doesn't understand
 if "?" in sync_url:
     base_url, query_string = sync_url.split("?", 1)
@@ -30,6 +31,8 @@ if "?" in sync_url:
         sync_url = f"{base_url}?{urlencode(params, doseq=True)}"
     else:
         sync_url = base_url
+=======
+>>>>>>> main
 if sync_url:
     config.set_main_option("sqlalchemy.url", sync_url)
 
@@ -37,8 +40,13 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Import all models so Alembic sees the full metadata
+<<<<<<< HEAD
 import LAYER2.layer2.app.models  # noqa: F401, E402
 from LAYER2.layer2.app.database import Base  # noqa: E402
+=======
+import app.models  # noqa: F401, E402
+from app.database import Base  # noqa: E402
+>>>>>>> main
 
 target_metadata = Base.metadata
 
