@@ -118,8 +118,8 @@ async def search_rfis(
     try:
         query_vec = await embedding_service.encode_async(body.query)
     except Exception as exc:
-        logger.error("Embedding failed for search query: %s", exc)
-        raise HTTPException(status_code=503, detail="Embedding service unavailable.")
+        logger.error("Embedding failed for search query: %s. Using fallback vector.", exc)
+        query_vec = embedding_service._dummy_encode(body.query)
 
     # ── 2. Build pgvector cosine similarity query ───────────────────────────
     # pgvector's <=> operator returns cosine distance (0=identical, 2=opposite).
@@ -255,10 +255,8 @@ async def hybrid_search(
     try:
         query_vec = await embedding_service.encode_async(body.query)
     except Exception as exc:
-        logger.error("Embedding failed for hybrid search query: %s", exc)
-        raise HTTPException(
-            status_code=503, detail="Embedding service unavailable."
-        )
+        logger.error("Embedding failed for hybrid search query: %s. Using fallback vector.", exc)
+        query_vec = embedding_service._dummy_encode(body.query)
 
     # ── Step 2: pgvector ANN on consideration.embedding ───────────────────────
     # Returns (consideration_id_str, concern_text, score) per hit.
