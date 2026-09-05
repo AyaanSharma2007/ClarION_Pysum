@@ -1,0 +1,5 @@
+# ClarION Workspace Root Requirements
+# Includes dependencies for Layer 1 Intake, Layer 2 Central Repo, Layer 4 Risk Engine, & Analysis Tools
+
+-r apps/backend/requirements.txt
+-r LAYER2/layer2/requirements.txt

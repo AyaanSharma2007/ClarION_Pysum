@@ -1,0 +1,44 @@
+version: "3.9"
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rfi_user
+      POSTGRES_PASSWORD: rfi_pass
+      POSTGRES_DB: rfi_nexus
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rfi_user -d rfi_nexus"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # OPA Policy Engine sidecar (Bible §6.1)
+  # Evaluates Rego rules for SLA, access, field validation, and submission gate.
+  # Fail-closed always — no environment-based toggle.
+  opa:
+    image: openpolicyagent/opa:latest
+    restart: unless-stopped
+    ports:
+      - "8181:8181"
+    command:
+      - "run"
+      - "--server"
+      - "--addr=0.0.0.0:8181"
+      - "/policy"
+    volumes:
+      - ./policy:/policy:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8181/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  pgdata:
+

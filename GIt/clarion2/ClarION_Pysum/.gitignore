@@ -1,0 +1,24 @@
+# Node & Monorepo dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Production builds
+dist/
+build/
+
+# Python / Backend
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+.env
+
+# Environment & OS
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.DS_Store
