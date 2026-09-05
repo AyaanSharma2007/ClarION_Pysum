@@ -19,9 +19,18 @@ class Settings(BaseSettings):
     # Sync URL is needed by Alembic (psycopg3 driver instead of asyncpg)
     @property
     def SYNC_DATABASE_URL(self) -> str:
-        return self.DATABASE_URL.replace(
+        from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+        url = self.DATABASE_URL.replace(
             "postgresql+asyncpg://", "postgresql+psycopg://"
         )
+        # Strip asyncpg-specific query params that psycopg doesn't understand
+        parsed = urlparse(url)
+        if parsed.query:
+            params = parse_qs(parsed.query)
+            params.pop("prepared_statement_cache_size", None)
+            new_query = urlencode(params, doseq=True)
+            url = urlunparse(parsed._replace(query=new_query))
+        return url
 
     # ── Embeddings ────────────────────────────────────────────────────────────
     EMBEDDING_BACKEND: Literal["sentence_transformers", "voyage", "dummy", "stub"] = (

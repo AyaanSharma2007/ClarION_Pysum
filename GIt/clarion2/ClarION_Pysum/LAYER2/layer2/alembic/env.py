@@ -19,6 +19,17 @@ config = context.config
 db_url = os.environ.get("DATABASE_URL", "")
 # Alembic needs a sync driver — swap asyncpg → psycopg
 sync_url = db_url.replace("postgresql+asyncpg://", "postgresql+psycopg://")
+# Strip asyncpg-specific query parameters that psycopg doesn't understand
+if "?" in sync_url:
+    base_url, query_string = sync_url.split("?", 1)
+    from urllib.parse import parse_qs, urlencode
+    params = parse_qs(query_string)
+    # Remove asyncpg-only params
+    params.pop("prepared_statement_cache_size", None)
+    if params:
+        sync_url = f"{base_url}?{urlencode(params, doseq=True)}"
+    else:
+        sync_url = base_url
 if sync_url:
     config.set_main_option("sqlalchemy.url", sync_url)
 

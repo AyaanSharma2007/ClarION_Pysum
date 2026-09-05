@@ -297,25 +297,29 @@ async def ingest_rfi(payload: RFIExtractionTemplate):
 
     # Write to Supabase Postgres
     supabase = get_supabase_client()
+
+    if not supabase:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Supabase is not configured. Set SUPABASE_URL and SUPABASE_KEY environment variables in apps/backend/.env"
+        )
+
+    try:
+        supabase.table("rfi_intake").insert(record_to_insert).execute()
+    except Exception as db_err:
+        logger.error("Supabase insert failed: %s", db_err)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Supabase database write failed: {str(db_err)}"
+        )
+
     db_status = "persisted"
     db_message = "Record written to Supabase Postgres table 'rfi_intake'."
-
-    if supabase:
-        try:
-            supabase.table("rfi_intake").insert(record_to_insert).execute()
-        except Exception as db_err:
-            db_status = "db_write_error"
-            db_message = f"Supabase insert error: {str(db_err)}"
-    else:
-        db_status = "persisted_mock"
-        db_message = "Supabase environment variables not configured. Record validated and prepared for Postgres write."
 
     # ── Forward to Layer 2 Central Repository ──────────────────────────────
     # Layer 2 stores the record in pgvector with per-consideration embeddings,
     # creates a tamper-evident audit chain, and makes the record searchable
     # via POST /search and POST /search/hybrid.
-    layer2_status = "not_forwarded"
-    layer2_message = ""
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             l2_response = await client.post(
@@ -329,16 +333,25 @@ async def ingest_rfi(payload: RFIExtractionTemplate):
                 layer2_status = "duplicate"
                 layer2_message = "Record already exists in Layer 2 (duplicate rfi_id)."
             else:
-                layer2_status = "forward_error"
-                layer2_message = f"Layer 2 returned HTTP {l2_response.status_code}: {l2_response.text[:200]}"
+                logger.error("Layer 2 returned HTTP %s: %s", l2_response.status_code, l2_response.text[:200])
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Layer 2 returned HTTP {l2_response.status_code}: {l2_response.text[:200]}"
+                )
+    except HTTPException:
+        raise
     except httpx.ConnectError:
-        layer2_status = "layer2_offline"
-        layer2_message = f"Layer 2 not reachable at {LAYER2_URL}. Record validated but not forwarded."
-        logger.warning("Layer 2 not reachable at %s — record not forwarded.", LAYER2_URL)
+        logger.error("Layer 2 not reachable at %s", LAYER2_URL)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Layer 2 is not reachable at {LAYER2_URL}. Ensure the Layer 2 service and its database are running."
+        )
     except Exception as l2_err:
-        layer2_status = "forward_error"
-        layer2_message = f"Layer 2 forwarding error: {str(l2_err)}"
         logger.error("Layer 2 forwarding failed: %s", l2_err)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Layer 2 forwarding error: {str(l2_err)}"
+        )
 
     return {
         "status": "success",
