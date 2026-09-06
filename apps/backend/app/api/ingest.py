@@ -4,7 +4,7 @@ import logging
 import base64
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
-from fastapi import APIRouter, UploadFile, File, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, UploadFile, File, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 import httpx
@@ -33,6 +33,91 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:1.5b")
 LAYER2_URL = os.getenv("LAYER2_URL", "http://localhost:8001")
 
 logger = logging.getLogger(__name__)
+
+# ── Neo4j credentials (optional — sync is skipped gracefully if not set) ──────
+NEO4J_URI      = os.getenv("NEO4J_URI")
+NEO4J_USER     = os.getenv("NEO4J_USER", "neo4j")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
+
+
+def _sync_rfi_to_neo4j(rfi_payload: dict) -> None:
+    """
+    Background task: MERGE the freshly-ingested RFI into Neo4j.
+    Called after a successful Layer 2 write. Safe to fail — errors are
+    only logged, never surfaced to the user.
+    """
+    if not NEO4J_URI or not NEO4J_PASSWORD:
+        logger.debug("Neo4j credentials not configured — skipping graph sync.")
+        return
+
+    try:
+        from neo4j import GraphDatabase  # lazy import — only needed if configured
+    except ImportError:
+        logger.warning("neo4j package not installed — skipping graph sync.")
+        return
+
+    MERGE_QUERY = """
+    MERGE (rfi:RFI {rfi_id: $rfi_id})
+    SET rfi.due_date       = CASE WHEN $due_date IS NULL THEN null ELSE datetime($due_date + 'T00:00:00Z') END,
+        rfi.response_date  = CASE WHEN $response_date IS NULL THEN null ELSE datetime($response_date + 'T00:00:00Z') END,
+        rfi.submit_date    = CASE WHEN $submit_date IS NULL THEN null ELSE datetime($submit_date + 'T00:00:00Z') END,
+        rfi.category       = $category
+
+    MERGE (msc:MSC {msc_country: $msc_country})
+    MERGE (rfi)-[:SUBMITTED_TO]->(msc)
+
+    MERGE (ind:Indication {indication_name: $indication_name})
+    MERGE (rfi)-[:INDICATION_TO]->(ind)
+
+    WITH rfi
+    UNWIND $considerations AS c
+      MERGE (cons:Consideration {consideration_id: c.id})
+      SET cons.consideration_number = c.number,
+          cons.concern_text         = c.concern_text,
+          cons.response_text        = c.response_text
+      MERGE (rfi)-[:HAS_CONSIDERATION]->(cons)
+
+      MERGE (art:CTR_Articles {ctr_article_name: c.ctr_article_name})
+      MERGE (cons)-[:REFERENCES]->(art)
+
+      FOREACH (_ IN CASE WHEN c.outcome_status IS NOT NULL THEN [1] ELSE [] END |
+        MERGE (out:Outcome {outcome_status: c.outcome_status})
+        MERGE (cons)-[:STATUS]->(out)
+      )
+    """
+
+    # Build flat considerations list from nested RFIExtractionTemplate shape
+    considerations = []
+    for c in rfi_payload.get("considerations", []):
+        considerations.append({
+            "id":               f'{rfi_payload["rfi_id"]}-C{c.get("number", 1)}',
+            "number":           c.get("number", 1),
+            "concern_text":     c.get("concern_text") or c.get("text") or "",
+            "ctr_article_name": (c.get("ctr_article") or {}).get("name") or "Unknown",
+            "response_text":    (c.get("response") or {}).get("text") or c.get("response_text") or "",
+            "outcome_status":   (c.get("outcome") or {}).get("status"),
+        })
+
+    params = {
+        "rfi_id":          rfi_payload["rfi_id"],
+        "due_date":        rfi_payload.get("due_date"),
+        "response_date":   rfi_payload.get("response_date"),
+        "submit_date":     rfi_payload.get("submit_date"),
+        "category":        rfi_payload.get("category"),
+        "msc_country":     (rfi_payload.get("msc") or {}).get("country") or "Unknown",
+        "indication_name": (rfi_payload.get("indication") or {}).get("name") or "Unknown",
+        "considerations":  considerations,
+    }
+
+    try:
+        driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
+        with driver.session() as session:
+            session.execute_write(lambda tx, p: tx.run(MERGE_QUERY, **p), params)
+        driver.close()
+        logger.info("Neo4j sync OK — %s", rfi_payload["rfi_id"])
+    except Exception as e:
+        logger.warning("Neo4j sync failed for %s: %s", rfi_payload.get("rfi_id"), e)
+
 
 def get_supabase_client() -> Optional[Client]:
     if SUPABASE_URL and SUPABASE_KEY:
@@ -285,7 +370,7 @@ Return ONLY raw valid JSON, wrapped inside a JSON code block. No explanations or
 
 
 @router.post("/ingest")
-async def ingest_rfi(payload: RFIExtractionTemplate):
+async def ingest_rfi(payload: RFIExtractionTemplate, background_tasks: BackgroundTasks):
     """
     1) Validates incoming RFI JSON.
     2) Appends immutable metadata (ingested_at, owner_team, validation_status).
@@ -366,6 +451,8 @@ async def ingest_rfi(payload: RFIExtractionTemplate):
             if l2_response.status_code in (200, 201):
                 layer2_status = "forwarded"
                 layer2_message = "Record stored in Layer 2 Central Repository (pgvector + audit chain)."
+                # Auto-sync to Neo4j in the background — transparent to the user
+                background_tasks.add_task(_sync_rfi_to_neo4j, validated_rfi.model_dump(mode="json"))
             elif l2_response.status_code == 409:
                 layer2_status = "duplicate"
                 layer2_message = "Record already exists in Layer 2 (duplicate rfi_id)."
