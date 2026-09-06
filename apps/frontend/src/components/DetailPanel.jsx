@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { advanceRfiStage, predictDossierRisk, searchSemantic } from '../services/api';
+import { advanceRfiStage, searchSemantic, draftAiResponse, getDraftHistory } from '../services/api';
 
-const STAGE_ORDER = ['received', 'ready_for_response', 'awaiting_response', 'drafting', 'pending_approval', 'approved', 'submitted'];
+const STAGE_ORDER = ['awaiting_response', 'drafting', 'pending_approval', 'approved', 'submitted'];
 const STAGE_LABELS = {
-  received: 'Received',
-  ready_for_response: 'Ready for Response',
   awaiting_response: 'Awaiting Response',
   drafting: 'Drafting',
   pending_approval: 'Pending Approval',
@@ -382,78 +380,112 @@ function RiskBars({ predictions }) {
   );
 }
 
-function DraftResponseSection({ rfi, suggestedText }) {
+function ConsiderationCard({ c, index, initialDraft, currentStage }) {
   const [draft, setDraft] = useState('');
   const [draftRisk, setDraftRisk] = useState(null);
-  const [scoring, setScoring] = useState(false);
+  const [drafting, setDrafting] = useState(false);
+  const [draftError, setDraftError] = useState('');
 
-  // Pre-fill draft with AI suggestion when available
+  const canDraft = ['awaiting_response', 'drafting'].includes(currentStage);
+
+  // Auto-load cached draft from DB on mount
   useEffect(() => {
-    if (suggestedText && !draft) setDraft(suggestedText);
-  }, [suggestedText]);
+    if (!c.id) return;
+    getDraftHistory(c.id)
+      .then(res => {
+        const drafts = res?.drafts || [];
+        if (drafts.length > 0) {
+          const latest = drafts[drafts.length - 1];
+          setDraft(latest.draft_text || '');
+          setDraftRisk(latest.risk_score ?? null);
+        } else if (initialDraft) {
+          setDraft(initialDraft);
+        }
+      })
+      .catch(() => {
+        if (initialDraft) setDraft(initialDraft);
+      });
+  }, [c.id]);
 
-  const scoreDraft = async () => {
-    if (!draft.trim() || scoring) return;
-    setScoring(true);
-    setDraftRisk(null);
+  const handleDraft = async () => {
+    if (drafting || !canDraft) return;
+    setDrafting(true);
+    setDraftError('');
     try {
-      // Build features from RFI context + infer from draft text
-      const draftLower = draft.toLowerCase();
-      const features = {
-        ...buildRiskFeatures(rfi),
-        // Infer completeness from draft content
-        has_statistics_section: draftLower.includes('statistic') || draftLower.includes('analysis') || !rfi.category?.toLowerCase().includes('statistic'),
-        has_impd_quality: draftLower.includes('quality') || draftLower.includes('impd') || !rfi.category?.toLowerCase().includes('impd'),
-        has_safety_pv_plan: draftLower.includes('safety') || draftLower.includes('pharmacovig') || !rfi.category?.toLowerCase().includes('safety'),
-        has_informed_consent: draftLower.includes('consent') || !rfi.category?.toLowerCase().includes('consent'),
-        prior_rfi_count: 1, // This IS a prior RFI
-      };
-      const result = await predictDossierRisk(features);
-      setDraftRisk(result);
+      const result = await draftAiResponse(c.id);
+      setDraft(result.draft_text);
+      setDraftRisk(result.risk_score);
     } catch (err) {
-      console.error('[DraftResponseSection] Risk scoring failed:', err);
+      console.error('[ConsiderationCard] Drafting failed:', err);
+      const msg = err?.detail || err?.message || 'Failed to generate draft.';
+      setDraftError(msg);
     } finally {
-      setScoring(false);
+      setDrafting(false);
     }
   };
 
   return (
-    <div style={s.draftCard}>
-      <div>
-        <div style={{ ...s.textLabel, color: 'var(--accent-pink)', marginBottom: 6 }}>Draft Response</div>
-        <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 10 }}>
-          Write or refine your response to this RFI. The AI suggestion below (from similar past cases) has been pre-filled as a starting point.
-        </div>
-        <textarea
-          id="draft-response-textarea"
-          style={s.draftTextarea}
-          value={draft}
-          onChange={e => setDraft(e.target.value)}
-          placeholder="Start typing your response here, or use the AI suggestion above as a starting point..."
-          onFocus={e => { e.target.style.borderColor = 'var(--accent-pink)'; }}
-          onBlur={e => { e.target.style.borderColor = 'var(--border)'; }}
-        />
+    <div style={s.considerationCard}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={s.numBadge}>{c.number || index + 1}</div>
+        {c.ctr_article_name && (
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{c.ctr_article_name}</div>
+        )}
       </div>
 
-      <button
-        id="score-draft-btn"
-        style={s.scoreBtn(scoring)}
-        disabled={scoring || !draft.trim()}
-        onClick={scoreDraft}
-      >
-        {scoring ? 'Scoring…' : '🔬 Score this Draft'}
-      </button>
-
-      {draftRisk && (
+      {c.concern_text ? (
         <div>
-          <div style={{ ...s.textLabel, marginBottom: 8 }}>Risk Assessment for Your Draft</div>
-          <div style={s.riskBarTrack} />
-          <RiskBars predictions={draftRisk.predictions} />
-          <div style={s.disclaimer}>
-            {draftRisk.disclaimer}
-          </div>
+          <div style={s.textLabel}>🔴 Concern (NCA Question)</div>
+          <div style={s.concernBlock}>{c.concern_text}</div>
+        </div>
+      ) : null}
+
+      {c.outcome_status && (
+        <div style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600 }}>
+          ✓ Outcome: {c.outcome_status}
         </div>
       )}
+
+      {/* AI Draft Section */}
+      <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+        {canDraft ? (
+          <button
+            style={s.scoreBtn(drafting)}
+            disabled={drafting || !c.concern_text || !c.id}
+            onClick={handleDraft}
+          >
+            {drafting ? 'Generating AI Draft...' : draft ? '↻ Regenerate Draft' : '✨ Draft Response'}
+          </button>
+        ) : (
+          <div style={{ ...s.loadingText, fontStyle: 'normal', color: 'var(--text-dim)', fontSize: 12 }}>
+            ✏ Draft available once stage is <strong>Awaiting Response</strong> or <strong>Drafting</strong>.
+          </div>
+        )}
+        {draftError && (
+          <div style={{ marginTop: 8, fontSize: 12, color: 'var(--red)', padding: '8px 12px', background: 'var(--red-light)', borderRadius: 'var(--radius-sm)' }}>
+            ⚠ {draftError}
+          </div>
+        )}
+
+        {draft && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ ...s.textLabel, color: 'var(--accent-pink)', marginBottom: 6 }}>AI Draft Response</div>
+            <div style={s.draftTextarea}>{draft}</div>
+          </div>
+        )}
+
+        {draftRisk !== null && draftRisk !== undefined && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ ...s.textLabel, marginBottom: 8 }}>Risk Assessment (Acceptance Probability)</div>
+            <div style={{ ...s.riskBarTrack, marginBottom: 6 }}>
+              <div style={s.riskBarFill(Math.round(draftRisk * 100))} />
+            </div>
+            <div style={s.riskPct(Math.round(draftRisk * 100))}>
+              {Math.round(draftRisk * 100)}% Probability of Acceptance
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -462,23 +494,15 @@ export default function DetailPanel({ rfi, onClose, onStageAdvanced }) {
   const [advancing, setAdvancing] = useState(false);
   const [stageMsg, setStageMsg] = useState('');
   const [stageMsgOk, setStageMsgOk] = useState(true);
-  const [risk, setRisk] = useState(null);
-  const [riskLoading, setRiskLoading] = useState(false);
+  const [currentStage, setCurrentStage] = useState(rfi.workflow_state?.current_stage || rfi.status || 'received');
   const [recommendations, setRecommendations] = useState([]);
   const [recsLoading, setRecsLoading] = useState(false);
 
-  const currentStage = rfi.workflow_state?.current_stage || rfi.status || 'received';
-  const currentIdx = STAGE_ORDER.indexOf(currentStage);
-
-  // Load risk with correct feature schema
   useEffect(() => {
-    setRisk(null);
-    setRiskLoading(true);
-    predictDossierRisk(buildRiskFeatures(rfi))
-      .then(res => setRisk(res))
-      .catch(err => { console.error('[DetailPanel] Risk prediction failed:', err); setRisk(null); })
-      .finally(() => setRiskLoading(false));
-  }, [rfi.id]);
+    setCurrentStage(rfi.workflow_state?.current_stage || rfi.status || 'received');
+  }, [rfi.id, rfi.workflow_state?.current_stage, rfi.status]);
+
+  const currentIdx = STAGE_ORDER.indexOf(currentStage);
 
   // Load similar past responses
   useEffect(() => {
@@ -497,10 +521,12 @@ export default function DetailPanel({ rfi, onClose, onStageAdvanced }) {
     setAdvancing(true);
     setStageMsg('');
     try {
-      await advanceRfiStage(rfi.id, nextStage);
+      const updatedRfi = await advanceRfiStage(rfi.id, nextStage);
+      const newStage = updatedRfi.workflow_state?.current_stage || updatedRfi.status || nextStage;
+      setCurrentStage(newStage);
       setStageMsgOk(true);
-      setStageMsg(`Advanced to ${STAGE_LABELS[nextStage]}`);
-      onStageAdvanced?.();
+      setStageMsg(`Advanced to ${STAGE_LABELS[newStage]}`);
+      onStageAdvanced?.(updatedRfi);
     } catch (err) {
       console.error('[DetailPanel] Stage advance failed:', err);
       setStageMsgOk(false);
@@ -558,59 +584,13 @@ export default function DetailPanel({ rfi, onClose, onStageAdvanced }) {
 
           <div style={s.divider} />
 
-          {/* Risk Assessment */}
-          <div>
-            <div style={s.sectionTitle}>⚠ Risk Assessment (per Category)</div>
-            <div style={s.riskCard}>
-              {riskLoading ? (
-                <div style={s.loadingText}>Calculating risk scores…</div>
-              ) : risk?.predictions ? (
-                <>
-                  <RiskBars predictions={risk.predictions} />
-                  <div style={s.disclaimer}>{risk.disclaimer}</div>
-                </>
-              ) : (
-                <div style={s.loadingText}>Risk model unavailable — start the Layer 1 backend.</div>
-              )}
-            </div>
-          </div>
-
-          <div style={s.divider} />
-
           {/* Considerations */}
           {rfi.considerations?.length > 0 && (
             <div>
               <div style={s.sectionTitle}>📝 Considerations ({rfi.considerations.length})</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {rfi.considerations.map((c, i) => (
-                  <div key={c.id || i} style={s.considerationCard}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={s.numBadge}>{c.number || i + 1}</div>
-                      {c.ctr_article_name && (
-                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{c.ctr_article_name}</div>
-                      )}
-                    </div>
-
-                    {c.concern_text ? (
-                      <div>
-                        <div style={s.textLabel}>🔴 Concern (NCA Question)</div>
-                        <div style={s.concernBlock}>{c.concern_text}</div>
-                      </div>
-                    ) : null}
-
-                    {c.response_text ? (
-                      <div>
-                        <div style={s.textLabel}>🔵 Sponsor Response</div>
-                        <div style={s.responseBlock}>{c.response_text}</div>
-                      </div>
-                    ) : null}
-
-                    {c.outcome_status && (
-                      <div style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600 }}>
-                        ✓ Outcome: {c.outcome_status}
-                      </div>
-                    )}
-                  </div>
+                  <ConsiderationCard key={c.id || i} c={c} index={i} initialDraft={i === 0 ? suggestedDraft : ''} currentStage={currentStage} />
                 ))}
               </div>
             </div>
@@ -642,14 +622,6 @@ export default function DetailPanel({ rfi, onClose, onStageAdvanced }) {
               </div>
             )}
           </div>
-
-          {/* Draft Response */}
-          <div>
-            <div style={s.sectionTitle}>✍ Draft Your Response</div>
-            <DraftResponseSection rfi={rfi} suggestedText={suggestedDraft} />
-          </div>
-
-          <div style={s.divider} />
 
           {/* Workflow Stage */}
           <div>

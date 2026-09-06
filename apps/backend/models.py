@@ -82,8 +82,8 @@ class Consideration(BaseModel):
         ...,
         description="Maps to (Consideration)-[:REFERENCES]->(CTRArticle)."
     )
-    response: Response = Field(
-        ...,
+    response: Optional[Response] = Field(
+        default=None,
         description="Maps to (Consideration)-[:HAS_RESPONSE]->(Response)."
     )
     outcome: Optional[Outcome] = Field(
@@ -111,8 +111,9 @@ class RFIExtractionTemplate(BaseModel):
                 "considerations": [
                     {
                         "number": 1,
+                        "concern_text": "Please provide evidence that...",
                         "ctr_article": {"name": "Part I - Regulatory / Annex I, Section 63"},
-                        "response": {"text": "Proof of payment of the additional amount required is provided."},
+                        "response": None,
                         "outcome": None
                     }
                 ]

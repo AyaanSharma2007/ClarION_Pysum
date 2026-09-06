@@ -152,6 +152,9 @@ async def parse_pdf(file: UploadFile = File(...)):
 You are an expert regulatory document parsing agent for EU CTR validation RFIs.
 Extract all required fields from the attached RFI PDF document and format the result as a strict JSON object.
 
+IMPORTANT: We ONLY want the problems/concerns stated in the RFI by the NCA authority.
+Do NOT extract the sponsor's response. Set the "response" field to null for every consideration.
+
 The JSON output MUST conform exactly to the following JSON Schema:
 {schema_json}
 
@@ -164,7 +167,7 @@ Field Guidelines:
   - number: Integer consideration number.
   - concern_text: CRITICAL — extract the NCA authority's question, concern, or objection text verbatim. This is the question ASKED BY the authority (e.g. 'Please provide evidence that...', 'Clarify the protocol section...'). If labelled as 'Concern', 'Question', 'RFI text', or 'Authority comment', extract it here. Do NOT leave this null if any concern/question text exists.
   - ctr_article.name: Referenced section/article/annex (e.g. 'Annex I, Section 63').
-  - response.text: The sponsor's response text extracted verbatim from the 'Sponsor response' field.
+  - response: ALWAYS set to null. Do NOT extract the sponsor's response text.
   - outcome: Optional object with status string or null.
 
 Return ONLY raw valid JSON, wrapped inside a JSON code block. No explanations or extra text.

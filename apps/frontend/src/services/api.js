@@ -188,3 +188,21 @@ export const getRiskFeatureSchema = async () => {
     throw err.response?.data || err;
   }
 };
+
+export const draftAiResponse = async (considerationId) => {
+  try {
+    const res = await axios.post(`${LAYER1_URL}/api/draft/${considerationId}`);
+    return res.data;
+  } catch (err) {
+    throw err.response?.data || err;
+  }
+};
+
+export const getDraftHistory = async (considerationId) => {
+  try {
+    const res = await axios.get(`${LAYER1_URL}/api/draft/${considerationId}/history`);
+    return res.data;
+  } catch (err) {
+    throw err.response?.data || err;
+  }
+};

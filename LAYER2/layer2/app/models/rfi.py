@@ -278,6 +278,41 @@ class Consideration(Base):
         back_populates="consideration",
         cascade="all, delete-orphan",
     )
+    ai_draft_responses: Mapped[list["AIDraftResponse"]] = relationship(
+        "AIDraftResponse",
+        back_populates="consideration",
+        cascade="all, delete-orphan",
+        order_by="AIDraftResponse.created_at",
+    )
+
+
+# ─── AI Draft Responses ────────────────────────────────────────────────────────
+
+class AIDraftResponse(Base):
+    """
+    Historical record of AI-drafted responses and their predicted acceptance risk scores.
+    """
+
+    __tablename__ = "ai_draft_response"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    consideration_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("consideration.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    draft_text: Mapped[str] = mapped_column(Text, nullable=False)
+    risk_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    consideration: Mapped["Consideration"] = relationship(
+        "Consideration", back_populates="ai_draft_responses"
+    )
 
 
 # ─── Response components (for the Layer 5 recommender) ────────────────────────

@@ -74,13 +74,13 @@ def _build_rfi_text(considerations: list) -> str:
     parts = []
     for c in considerations:
         concern = getattr(c, "concern_text", None) or ""
-        response = (c.response.text if c.response else None) or ""
-        if concern or response:
+        response_text = (c.response.text if c.response else None) or ""
+        if concern or response_text:
             block = f"Consideration {c.number}:"
             if concern:
                 block += f"\nConcern: {concern}"
-            if response:
-                block += f"\nResponse: {response}"
+            if response_text:
+                block += f"\nResponse: {response_text}"
             parts.append(block)
     return "\n\n".join(parts)
 
@@ -218,7 +218,7 @@ async def _ingest_one(db: AsyncSession, payload: RFICreate) -> RFI:
         # Embed the concern + response text for per-consideration ANN search.
         c_text = (
             f"{c_payload.concern_text or ''}".strip()
-            + ("\n" + c_payload.response.text.strip() if c_payload.response.text else "")
+            + ("\n" + c_payload.response.text.strip() if c_payload.response and c_payload.response.text else "")
         ).strip()
         c_embedding: Optional[list[float]] = None
         if c_text:
@@ -235,7 +235,7 @@ async def _ingest_one(db: AsyncSession, payload: RFICreate) -> RFI:
             number=c_payload.number,
             consideration_id_str=consideration_id_str,
             concern_text=c_payload.concern_text,
-            response_text=c_payload.response.text,
+            response_text=c_payload.response.text if c_payload.response else None,
             embedding=c_embedding,
             outcome_status=outcome_status,
             ctr_article_id=article.id,
@@ -245,7 +245,7 @@ async def _ingest_one(db: AsyncSession, payload: RFICreate) -> RFI:
     # ── 7. Initialise WorkflowState ──────────────────────────────────────────
     workflow = WorkflowState(
         rfi_id=rfi.id,
-        current_stage="received",
+        current_stage="awaiting_response",
         stage_entered_at=datetime.now(tz=timezone.utc),
         sla_due_at=_sla_due_at(),
     )
@@ -255,7 +255,7 @@ async def _ingest_one(db: AsyncSession, payload: RFICreate) -> RFI:
     audit_data = {
         "action": "ingested",
         "actor": payload.owner_team or "system",
-        "metadata": {"rfi_id": payload.rfi_id, "stage": "Received"},
+        "metadata": {"rfi_id": payload.rfi_id, "stage": "Awaiting Response"},
         "created_at": datetime.now(tz=timezone.utc).isoformat(),
     }
     curr_hash = compute_hash(None, audit_data)

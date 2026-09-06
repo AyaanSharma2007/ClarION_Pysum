@@ -73,7 +73,7 @@ class ConsiderationCreate(BaseModel):
         "Optional — Layer 1 payloads may not include it (depends on extraction schema version).",
     )
     ctr_article: CTRArticleSchema
-    response: ResponseSchema
+    response: Optional[ResponseSchema] = None
     outcome: Optional[OutcomeSchema] = None
 
 

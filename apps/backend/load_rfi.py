@@ -61,8 +61,10 @@ UNWIND $considerations AS c
   MERGE (art:CTR_Articles {ctr_article_name: c.ctr_article_name})
   MERGE (cons)-[:REFERENCES]->(art)
 
-  MERGE (resp:Response {response_text: c.response_text})
-  MERGE (cons)-[:HAS_RESPONSE]->(resp)
+  FOREACH (_ IN CASE WHEN c.response_text IS NOT NULL AND c.response_text <> '' THEN [1] ELSE [] END |
+    MERGE (resp:Response {response_text: c.response_text})
+    MERGE (cons)-[:HAS_RESPONSE]->(resp)
+  )
 
   FOREACH (_ IN CASE WHEN c.outcome_status IS NOT NULL THEN [1] ELSE [] END |
     MERGE (out:Outcome {outcome_status: c.outcome_status})

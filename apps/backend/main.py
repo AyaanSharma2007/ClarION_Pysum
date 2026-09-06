@@ -19,6 +19,7 @@ from apps.backend.app.api.risk_router import router as risk_router
 from apps.backend.app.api.governance import router as governance_router
 from apps.backend.app.api.rfi import router as rfi_router
 from apps.backend.app.api.intelligence import router as intelligence_router
+from apps.backend.app.api.draft_router import router as draft_router
 from apps.backend.models import RFIExtractionTemplate
 
 app = FastAPI(
@@ -49,6 +50,9 @@ app.include_router(rfi_router)
 
 # Include Intelligence Router (Layers 3 & 5)
 app.include_router(intelligence_router)
+
+# Include AI Draft Response Router
+app.include_router(draft_router)
 
 class RFIResponse(BaseModel):
     id: str

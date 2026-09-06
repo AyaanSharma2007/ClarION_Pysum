@@ -22,6 +22,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from LAYER2.layer2.app.routers import governance, ingest
+from LAYER2.layer2.app.routers import consideration_api
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -92,6 +93,7 @@ app.add_middleware(
 app.include_router(governance.router)
 app.include_router(ingest.router)
 app.include_router(search_router.router)
+app.include_router(consideration_api.router)
 
 
 # ── Health check ──────────────────────────────────────────────────────────────
