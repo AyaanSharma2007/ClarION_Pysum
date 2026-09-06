@@ -164,18 +164,11 @@ export const submitCategoryCorrection = async (
     });
     return res.data;
   } catch (err) {
-    // Graceful fallback response
-    return {
-      status: 'recorded',
-      rfi_id: rfiId,
-      original_category: originalCategory,
-      corrected_category: correctedCategory,
-      active_learning_dataset: 'extraction_correction',
-      target_model: 'Qwen2.5-7B-Instruct-LoRA',
-      owner_team: 'EU-Hub-Regulatory',
-    };
+    console.error('[submitCategoryCorrection] Failed to record correction:', err?.response?.data || err);
+    throw err.response?.data || err;
   }
 };
+
 
 // Layer 4 Risk Prediction Engine API calls (Clarion Bible §9)
 export const predictDossierRisk = async (dossierFeatures) => {

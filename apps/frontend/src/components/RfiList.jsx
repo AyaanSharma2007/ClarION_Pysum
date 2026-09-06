@@ -1,24 +1,19 @@
 import React, { useState, useEffect } from 'react';
 
 function getSlaInfo(sla_due_at) {
-  if (!sla_due_at) return { label: 'No SLA', color: 'var(--text-dim)', pct: 0 };
+  if (!sla_due_at) return { label: 'No SLA', color: 'var(--text-dim)', bg: '#f4f6fb', pct: 0 };
   const now = Date.now();
   const due = new Date(sla_due_at).getTime();
-  const totalMs = 72 * 60 * 60 * 1000; // 72h standard window
+  const totalMs = 72 * 60 * 60 * 1000;
   const diffMs = due - now;
-
-  if (diffMs <= 0) return { label: 'OVERDUE', color: 'var(--red)', pct: 0 };
-
+  if (diffMs <= 0) return { label: 'Overdue', color: 'var(--red)', bg: 'var(--red-light)', pct: 0 };
   const hours = Math.floor(diffMs / 3600000);
   const mins = Math.floor((diffMs % 3600000) / 60000);
   const pct = Math.min(100, Math.round((diffMs / totalMs) * 100));
-
-  const label = hours > 24
-    ? `${Math.floor(hours / 24)}d ${hours % 24}h`
-    : `${hours}h ${mins}m`;
-
-  const color = pct > 50 ? 'var(--green)' : pct > 20 ? 'var(--amber)' : 'var(--red)';
-  return { label, color, pct };
+  const label = hours > 24 ? `${Math.floor(hours / 24)}d ${hours % 24}h` : `${hours}h ${mins}m`;
+  if (pct > 50) return { label, color: 'var(--green)', bg: 'var(--green-light)', pct };
+  if (pct > 20) return { label, color: 'var(--amber)', bg: 'var(--amber-light)', pct };
+  return { label, color: 'var(--red)', bg: 'var(--red-light)', pct };
 }
 
 const STAGE_LABELS = {
@@ -33,55 +28,53 @@ const s = {
   list: {
     display: 'flex',
     flexDirection: 'column',
-    gap: 4,
+    gap: 8,
     overflowY: 'auto',
     flex: 1,
+    paddingTop: 4,
   },
-  card: (selected, faded) => ({
-    background: selected ? '#1c1c1c' : '#111',
-    border: `1px solid ${selected ? '#333' : 'var(--border)'}`,
-    borderRadius: 10,
-    padding: '14px 16px',
-    cursor: faded ? 'default' : 'pointer',
-    transition: 'background 0.15s, border-color 0.15s, transform 0.1s',
-    opacity: faded ? 0.45 : 1,
+  card: (selected) => ({
+    background: selected ? 'var(--accent-blue-light)' : '#ffffff',
+    border: `1.5px solid ${selected ? 'var(--accent-blue)' : 'var(--border)'}`,
+    borderRadius: 'var(--radius-md)',
+    padding: '14px 18px',
+    cursor: 'pointer',
+    transition: 'all 0.18s',
     display: 'flex',
     gap: 14,
     alignItems: 'center',
+    boxShadow: selected ? '0 2px 12px rgba(79,114,255,0.14)' : 'var(--shadow-sm)',
   }),
   dot: (color) => ({
-    width: 8,
-    height: 8,
+    width: 10,
+    height: 10,
     borderRadius: '50%',
     background: color,
     flexShrink: 0,
-    boxShadow: `0 0 6px ${color}`,
+    boxShadow: `0 0 0 3px ${color}22`,
   }),
-  main: {
-    flex: 1,
-    minWidth: 0,
-  },
+  main: { flex: 1, minWidth: 0 },
   topRow: {
     display: 'flex',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 4,
+    marginBottom: 5,
+    flexWrap: 'wrap',
   },
   rfiId: {
     fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 12,
-    color: '#e5e5e5',
-    fontWeight: 600,
+    fontSize: 11,
+    color: 'var(--text)',
+    fontWeight: 700,
     flexShrink: 0,
   },
   category: {
     fontSize: 10,
     fontWeight: 600,
-    padding: '2px 6px',
-    borderRadius: 4,
-    background: 'rgba(59,130,246,0.1)',
-    color: '#60a5fa',
-    border: '1px solid rgba(59,130,246,0.2)',
+    padding: '2px 8px',
+    borderRadius: 20,
+    background: 'var(--accent-pink-light)',
+    color: 'var(--accent-pink)',
     flexShrink: 0,
   },
   indication: {
@@ -90,62 +83,70 @@ const s = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+    flex: 1,
   },
   bottomRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: 10,
-    marginTop: 6,
+    gap: 8,
+    flexWrap: 'wrap',
   },
   country: {
     fontSize: 11,
     color: 'var(--text-dim)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
   },
   stagePill: {
     fontSize: 10,
-    padding: '2px 7px',
-    borderRadius: 4,
-    background: '#1e1e1e',
+    padding: '2px 8px',
+    borderRadius: 20,
+    background: 'var(--accent-blue-light)',
+    color: 'var(--accent-blue)',
+    fontWeight: 500,
+  },
+  consCount: {
+    fontSize: 11,
     color: 'var(--text-dim)',
-    border: '1px solid #2a2a2a',
   },
   slaRight: {
-    marginLeft: 'auto',
     textAlign: 'right',
     flexShrink: 0,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: 4,
   },
-  slaLabel: (color) => ({
-    fontSize: 12,
+  slaBadge: (color, bg) => ({
+    fontSize: 11,
     fontWeight: 700,
-    fontFamily: "'JetBrains Mono', monospace",
     color,
+    background: bg,
+    padding: '3px 10px',
+    borderRadius: 20,
+    whiteSpace: 'nowrap',
   }),
-  slaBar: (pct, color) => ({
-    height: 2,
-    borderRadius: 1,
-    background: `linear-gradient(to right, ${color} ${pct}%, #1e1e1e ${pct}%)`,
-    width: 64,
-    marginTop: 3,
-  }),
-  spinnerRow: {
+  pendingRow: {
+    background: '#fff',
+    border: '1.5px dashed var(--border)',
+    borderRadius: 'var(--radius-md)',
+    padding: '14px 18px',
     display: 'flex',
     alignItems: 'center',
-    gap: 10,
-    padding: '14px 16px',
-    background: '#111',
-    border: '1px dashed #2a2a2a',
-    borderRadius: 10,
+    gap: 12,
+    opacity: 0.65,
   },
-  spinnerText: {
-    fontSize: 12,
-    color: 'var(--text-dim)',
-  },
+  pendingText: { fontSize: 12, color: 'var(--text-muted)' },
+  pendingName: { fontSize: 12, color: 'var(--text)', fontWeight: 600 },
   empty: {
-    padding: '60px 0',
+    padding: '64px 0',
     textAlign: 'center',
     color: 'var(--text-dim)',
-    fontSize: 13,
+    fontSize: 14,
+    animation: 'fadeIn 0.3s ease',
   },
+  emptyIcon: { fontSize: 36, marginBottom: 12 },
 };
 
 function SlaTimer({ sla_due_at }) {
@@ -155,37 +156,33 @@ function SlaTimer({ sla_due_at }) {
     return () => clearInterval(t);
   }, [sla_due_at]);
 
-  return (
-    <div style={s.slaRight}>
-      <div style={s.slaLabel(info.color)}>{info.label}</div>
-      <div style={s.slaBar(info.pct, info.color)} />
-    </div>
-  );
+  return <div style={s.slaBadge(info.color, info.bg)}>{info.label}</div>;
 }
 
 export default function RfiList({ rfis, pendingUploads, selectedId, onSelect }) {
   if (rfis.length === 0 && pendingUploads.length === 0) {
     return (
       <div style={s.list}>
-        <div style={s.empty}>No RFIs found. Upload a PDF to get started.</div>
+        <div style={s.empty}>
+          <div style={s.emptyIcon}>📋</div>
+          No RFIs found. Upload a PDF to get started.
+        </div>
       </div>
     );
   }
 
   return (
     <div style={s.list}>
-      {/* Pending uploads — faded optimistic rows */}
       {pendingUploads.map(p => (
-        <div key={p.id} style={s.spinnerRow}>
-          <span style={{ fontSize: 16, animation: 'spin 1s linear infinite' }}>⏳</span>
+        <div key={p.id} style={s.pendingRow}>
+          <span style={{ fontSize: 18, animation: 'spin 1.2s linear infinite', display: 'inline-block' }}>⏳</span>
           <div>
-            <div style={{ fontSize: 12, color: '#888', fontWeight: 600 }}>{p.filename}</div>
-            <div style={s.spinnerText}>Parsing & ingesting in background…</div>
+            <div style={s.pendingName}>{p.filename}</div>
+            <div style={s.pendingText}>Parsing & ingesting — this may take a moment…</div>
           </div>
         </div>
       ))}
 
-      {/* Real RFI rows */}
       {rfis.map(rfi => {
         const sla = getSlaInfo(rfi.workflow_state?.sla_due_at);
         const stage = rfi.workflow_state?.current_stage || rfi.status || 'received';
@@ -195,10 +192,10 @@ export default function RfiList({ rfis, pendingUploads, selectedId, onSelect }) 
           <div
             key={rfi.id}
             id={`rfi-row-${rfi.id}`}
-            style={s.card(isSelected, false)}
+            style={s.card(isSelected)}
             onClick={() => onSelect(rfi)}
-            onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = '#161616'; }}
-            onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = '#111'; }}
+            onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; e.currentTarget.style.borderColor = 'var(--border-hover)'; } }}
+            onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.background = '#fff'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; e.currentTarget.style.borderColor = 'var(--border)'; } }}
           >
             <div style={s.dot(sla.color)} />
 
@@ -206,22 +203,22 @@ export default function RfiList({ rfis, pendingUploads, selectedId, onSelect }) 
               <div style={s.topRow}>
                 <span style={s.rfiId}>{rfi.rfi_id}</span>
                 {rfi.category && <span style={s.category}>{rfi.category}</span>}
-                <span style={{...s.indication, flex: 1}}>
-                  {rfi.therapeutic_area_name || '—'}
-                </span>
+                <span style={s.indication}>{rfi.therapeutic_area_name || '—'}</span>
               </div>
               <div style={s.bottomRow}>
-                <span style={s.country}>{rfi.nca_country || '—'}</span>
+                <span style={s.country}>🌍 {rfi.nca_country || '—'}</span>
                 <span style={s.stagePill}>{STAGE_LABELS[stage] || stage}</span>
                 {rfi.considerations?.length > 0 && (
-                  <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+                  <span style={s.consCount}>
                     {rfi.considerations.length} consideration{rfi.considerations.length !== 1 ? 's' : ''}
                   </span>
                 )}
               </div>
             </div>
 
-            <SlaTimer sla_due_at={rfi.workflow_state?.sla_due_at} />
+            <div style={s.slaRight}>
+              <SlaTimer sla_due_at={rfi.workflow_state?.sla_due_at} />
+            </div>
           </div>
         );
       })}

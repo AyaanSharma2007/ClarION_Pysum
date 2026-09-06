@@ -4,7 +4,7 @@ import RfiList from './components/RfiList';
 import DetailPanel from './components/DetailPanel';
 import { fetchAllRfis, parsePdfLayer1, ingestRfiLayer1 } from './services/api';
 
-// ── CSS animation for slide-in panel
+// CSS animation for slide-in panel
 const styleEl = document.createElement('style');
 styleEl.textContent = `
   @keyframes slideInRight {
@@ -14,6 +14,10 @@ styleEl.textContent = `
   @keyframes spin {
     from { transform: rotate(0deg); }
     to   { transform: rotate(360deg); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
 `;
 document.head.appendChild(styleEl);
@@ -38,24 +42,39 @@ const s = {
   },
   topBar: {
     borderBottom: '1px solid var(--border)',
-    padding: '0 28px',
+    padding: '0 32px',
     display: 'flex',
     alignItems: 'center',
     gap: 16,
-    height: 56,
+    height: 62,
     flexShrink: 0,
     position: 'sticky',
     top: 0,
-    background: '#080808',
+    background: '#ffffff',
     zIndex: 50,
+    boxShadow: 'var(--shadow-sm)',
+  },
+  logoWrap: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    flexShrink: 0,
+  },
+  logoIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    background: 'linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-pink) 100%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 16,
   },
   logo: {
-    fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: 700,
-    color: '#fff',
+    color: 'var(--text)',
     letterSpacing: '-0.02em',
-    flexShrink: 0,
   },
   logoSub: {
     fontSize: 10,
@@ -64,60 +83,67 @@ const s = {
     display: 'block',
     letterSpacing: 0,
   },
+  refreshBtn: {
+    background: 'transparent',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-sm)',
+    color: 'var(--text-muted)',
+    cursor: 'pointer',
+    padding: '7px 13px',
+    fontSize: 12,
+    transition: 'all 0.15s',
+    flexShrink: 0,
+  },
   uploadBtn: (uploading) => ({
     marginLeft: 'auto',
     display: 'flex',
     alignItems: 'center',
     gap: 7,
-    padding: '8px 16px',
-    background: uploading ? '#1a1a1a' : '#fff',
-    color: uploading ? '#888' : '#000',
-    border: 'none',
-    borderRadius: 8,
+    padding: '9px 20px',
+    background: uploading
+      ? 'var(--bg)'
+      : 'linear-gradient(135deg, var(--accent-blue) 0%, #6f8fff 100%)',
+    color: uploading ? 'var(--text-muted)' : '#ffffff',
+    border: uploading ? '1px solid var(--border)' : 'none',
+    borderRadius: 'var(--radius-md)',
     fontSize: 13,
-    fontWeight: 700,
+    fontWeight: 600,
     cursor: uploading ? 'not-allowed' : 'pointer',
-    transition: 'all 0.15s',
+    transition: 'all 0.2s',
     flexShrink: 0,
+    boxShadow: uploading ? 'none' : '0 2px 12px rgba(79,114,255,0.30)',
   }),
-  refreshBtn: {
-    background: 'transparent',
-    border: '1px solid var(--border)',
-    borderRadius: 7,
-    color: 'var(--text-muted)',
-    cursor: 'pointer',
-    padding: '6px 11px',
-    fontSize: 12,
-    transition: 'border-color 0.15s',
-    flexShrink: 0,
-  },
   main: {
     flex: 1,
-    maxWidth: 900,
+    maxWidth: 920,
     width: '100%',
     margin: '0 auto',
-    padding: '0 28px 40px',
+    padding: '0 28px 48px',
     display: 'flex',
     flexDirection: 'column',
     minHeight: 0,
   },
   errorBanner: {
     margin: '16px 0',
-    padding: '12px 16px',
-    background: 'rgba(239,68,68,0.07)',
-    border: '1px solid rgba(239,68,68,0.2)',
-    borderRadius: 8,
-    color: '#fca5a5',
-    fontSize: 12,
+    padding: '12px 18px',
+    background: 'var(--red-light)',
+    border: '1px solid rgba(239,83,80,0.2)',
+    borderRadius: 'var(--radius-sm)',
+    color: '#c62828',
+    fontSize: 13,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
   },
   loadingRow: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     padding: '80px 0',
-    gap: 10,
+    gap: 12,
     color: 'var(--text-dim)',
-    fontSize: 13,
+    fontSize: 14,
+    animation: 'fadeIn 0.3s ease',
   },
 };
 
@@ -138,13 +164,13 @@ export default function App() {
     sort: 'sla_asc',
   });
 
-  // ── Fetch all RFIs ─────────────────────────────────────────────────────────
   const loadRfis = useCallback(async () => {
     try {
       const data = await fetchAllRfis();
       setRfis(Array.isArray(data) ? data : []);
       setError(null);
     } catch (e) {
+      console.error('[App] fetchAllRfis failed:', e);
       setError('Could not reach Layer 2 (localhost:8001). Make sure the server is running.');
     } finally {
       setLoading(false);
@@ -157,30 +183,21 @@ export default function App() {
     return () => clearInterval(t);
   }, [loadRfis]);
 
-  // ── Upload handler ─────────────────────────────────────────────────────────
   const handleFileSelected = useCallback(async (file) => {
     if (!file || uploading) return;
     if (!file.name.endsWith('.pdf') && file.type !== 'application/pdf') return;
 
     const pendingId = `pending-${Date.now()}`;
-    const pendingEntry = { id: pendingId, filename: file.name };
-
-    // 1. Optimistically show a faded placeholder row immediately
-    setPendingUploads(prev => [...prev, pendingEntry]);
+    setPendingUploads(prev => [...prev, { id: pendingId, filename: file.name }]);
     setUploading(true);
 
     try {
-      // 2. Parse PDF (runs against Layer 1 Ollama pipeline)
       const parsed = await parsePdfLayer1(file);
-
-      // 3. Ingest into Layer 2
       await ingestRfiLayer1(parsed);
-
-      // 4. Remove placeholder, refresh list to show real record
       setPendingUploads(prev => prev.filter(p => p.id !== pendingId));
       await loadRfis();
     } catch (e) {
-      // Remove placeholder on failure (silently for non-IT users)
+      console.error('[App] PDF upload/ingest failed:', e);
       setPendingUploads(prev => prev.filter(p => p.id !== pendingId));
     } finally {
       setUploading(false);
@@ -188,16 +205,13 @@ export default function App() {
     }
   }, [uploading, loadRfis]);
 
-  // ── Distinct countries for filter dropdown ─────────────────────────────────
   const countries = useMemo(
     () => [...new Set(rfis.map(r => r.nca_country).filter(Boolean))].sort(),
     [rfis]
   );
 
-  // ── Filtered + sorted list ─────────────────────────────────────────────────
   const displayRfis = useMemo(() => {
     let list = [...rfis];
-
     if (filters.query.trim()) {
       const q = filters.query.toLowerCase();
       list = list.filter(r =>
@@ -211,34 +225,23 @@ export default function App() {
         )
       );
     }
-
-    if (filters.country !== 'all') {
-      list = list.filter(r => r.nca_country === filters.country);
-    }
-
-    if (filters.stage !== 'all') {
-      list = list.filter(r =>
-        (r.workflow_state?.current_stage || r.status) === filters.stage
-      );
-    }
-
-    if (filters.category !== 'all') {
-      list = list.filter(r => r.category === filters.category);
-    }
-
-    const sortFn = SORT_FNS[filters.sort] || SORT_FNS.sla_asc;
-    list.sort(sortFn);
-
+    if (filters.country !== 'all') list = list.filter(r => r.nca_country === filters.country);
+    if (filters.stage !== 'all') list = list.filter(r => (r.workflow_state?.current_stage || r.status) === filters.stage);
+    if (filters.category !== 'all') list = list.filter(r => r.category === filters.category);
+    list.sort(SORT_FNS[filters.sort] || SORT_FNS.sla_asc);
     return list;
   }, [rfis, filters]);
 
   return (
     <div style={s.root}>
-      {/* ── Top Bar ── */}
+      {/* Top Bar */}
       <header style={s.topBar}>
-        <div style={s.logo}>
-          ClarION
-          <span style={s.logoSub}>EU CTR Regulatory Intelligence</span>
+        <div style={s.logoWrap}>
+          <div style={s.logoIcon}>🧬</div>
+          <div>
+            <div style={s.logo}>ClarION</div>
+            <span style={s.logoSub}>EU CTR Regulatory Intelligence</span>
+          </div>
         </div>
 
         <button
@@ -246,13 +249,12 @@ export default function App() {
           style={s.refreshBtn}
           onClick={loadRfis}
           title="Refresh list"
-          onMouseEnter={e => (e.target.style.borderColor = '#555')}
-          onMouseLeave={e => (e.target.style.borderColor = 'var(--border)')}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.borderColor = 'var(--border-hover)'; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'var(--border)'; }}
         >
           ↻ Refresh
         </button>
 
-        {/* Hidden file input */}
         <input
           ref={fileInputRef}
           type="file"
@@ -267,16 +269,21 @@ export default function App() {
           style={s.uploadBtn(uploading)}
           disabled={uploading}
           onClick={() => !uploading && fileInputRef.current?.click()}
+          onMouseEnter={e => { if (!uploading) e.currentTarget.style.boxShadow = '0 4px 20px rgba(79,114,255,0.45)'; }}
+          onMouseLeave={e => { if (!uploading) e.currentTarget.style.boxShadow = '0 2px 12px rgba(79,114,255,0.30)'; }}
         >
-          {uploading ? '⏳ Processing…' : '↑ Upload RFI'}
+          {uploading ? '⏳ Processing…' : '↑  Upload RFI'}
         </button>
       </header>
 
-      {/* ── Main Content ── */}
+      {/* Main Content */}
       <main style={s.main}>
-        {error && <div style={s.errorBanner}>⚠ {error}</div>}
+        {error && (
+          <div style={s.errorBanner}>
+            <span>⚠</span> {error}
+          </div>
+        )}
 
-        {/* Filter Bar */}
         <FilterBar
           filters={filters}
           setFilters={setFilters}
@@ -284,11 +291,10 @@ export default function App() {
           resultCount={displayRfis.length}
         />
 
-        {/* RFI List */}
         {loading ? (
           <div style={s.loadingRow}>
-            <span style={{ fontSize: 20, animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</span>
-            Loading RFIs from database…
+            <span style={{ fontSize: 22, animation: 'spin 1.2s linear infinite', display: 'inline-block' }}>⏳</span>
+            Loading RFIs…
           </div>
         ) : (
           <RfiList
@@ -300,7 +306,6 @@ export default function App() {
         )}
       </main>
 
-      {/* ── Detail Panel (slide-in) ── */}
       {selectedRfi && (
         <DetailPanel
           rfi={selectedRfi}
