@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { advanceRfiStage, searchSemantic, draftAiResponse, getDraftHistory } from '../services/api';
+import MiniProgressBar from './MiniProgressBar';
 
 const STAGE_ORDER = ['awaiting_response', 'drafting', 'pending_approval', 'approved', 'submitted'];
 const STAGE_LABELS = {
@@ -344,16 +345,18 @@ function SlaTicker({ sla_due_at }) {
   }, [sla_due_at]);
 
   return (
-    <div style={s.slaCard(info.color, info.bg)}>
-      <div>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Submission deadline</div>
-        <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 3 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 14px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
           {sla_due_at
-            ? new Date(sla_due_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-            : '—'}
-        </div>
+            ? `Due ${new Date(sla_due_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+            : 'No deadline set'}
+        </span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: info.color, fontFamily: "'JetBrains Mono', monospace" }}>
+          {info.label} ({info.pct}%)
+        </span>
       </div>
-      <div style={s.slaBig(info.color)}>{info.label}</div>
+      <MiniProgressBar percent={info.pct} />
     </div>
   );
 }
@@ -407,12 +410,12 @@ function ConsiderationCard({ c, index, initialDraft, currentStage }) {
       });
   }, [c.id]);
 
-  const handleDraft = async () => {
+  const handleDraft = async (force = false) => {
     if (drafting || !canDraft) return;
     setDrafting(true);
     setDraftError('');
     try {
-      const result = await draftAiResponse(c.id);
+      const result = await draftAiResponse(c.id, force);
       setDraft(result.draft_text);
       setDraftRisk(result.risk_score);
     } catch (err) {
@@ -452,7 +455,7 @@ function ConsiderationCard({ c, index, initialDraft, currentStage }) {
           <button
             style={s.scoreBtn(drafting)}
             disabled={drafting || !c.concern_text || !c.id}
-            onClick={handleDraft}
+            onClick={() => handleDraft(Boolean(draft))}
           >
             {drafting ? 'Generating AI Draft...' : draft ? '↻ Regenerate Draft' : '✨ Draft Response'}
           </button>
@@ -601,26 +604,39 @@ export default function DetailPanel({ rfi, onClose, onStageAdvanced }) {
             <div style={s.sectionTitle}>💡 Similar Past Responses</div>
             {recsLoading ? (
               <div style={s.loadingText}>Searching regulatory memory…</div>
-            ) : recommendations.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {recommendations.map((rec, i) => (
-                  <div key={i} style={s.recommendCard}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>
-                      Similar Case #{i + 1} · Match {Math.round((rec.score || 0) * 100)}%
-                    </div>
-                    <div>
-                      {rec.rfi?.considerations?.[0]?.response_text || rec.rfi?.rfi_text || 'No response text available.'}
-                    </div>
+            ) : (() => {
+              const validRecs = recommendations.filter(rec => {
+                const text = rec.rfi?.considerations?.find(c => c.response_text)?.response_text || rec.rfi?.considerations?.[0]?.response_text || rec.rfi?.rfi_text;
+                return text && text.trim() && text !== 'No response text available.';
+              });
+
+              if (validRecs.length === 0) {
+                return (
+                  <div style={{ ...s.loadingText, padding: '12px 16px', background: 'var(--bg-card)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', color: 'var(--text-dim)', fontStyle: 'normal' }}>
+                    No similar past responses found.
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ ...s.loadingText, padding: '12px 16px', background: 'var(--bg)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
-                {rfi.considerations?.find(c => c.concern_text)
-                  ? 'No similar cases found in the database yet.'
-                  : 'No concern text available to search for similar cases.'}
-              </div>
-            )}
+                );
+              }
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {validRecs.map((rec, i) => {
+                    const respText = rec.rfi?.considerations?.find(c => c.response_text)?.response_text || rec.rfi?.considerations?.[0]?.response_text || rec.rfi?.rfi_text;
+                    const matchScore = Math.round((rec.score || 0) * 100);
+                    return (
+                      <div key={i} style={s.recommendCard}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>
+                          Similar Case #{i + 1} · Match {matchScore}%
+                        </div>
+                        <div style={{ color: 'var(--text)' }}>
+                          {respText}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Workflow Stage */}

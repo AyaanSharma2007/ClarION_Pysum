@@ -97,7 +97,6 @@ async def _generate_draft_with_gemini(
 to an EU CTR (Clinical Trial Regulation 536/2014) validation RFI.
 
 RFI Context:
-- RFI ID: {rfi_id}
 - Member State: {country}
 - Therapeutic Indication: {indication}
 
@@ -109,9 +108,9 @@ Instructions:
 1. Draft a professional, compliant sponsor response that directly addresses the authority's concern.
 2. Be specific, cite relevant regulatory sections where applicable.
 3. Use formal regulatory language appropriate for EU CTR submissions.
-4. The response should be comprehensive but concise.
+4. The response should be concise and under 50 words.
 5. If previous drafts exist, improve upon them based on their acceptance scores.
-6. The response should be very concise and under 50 words.
+
 Draft the response now:"""
 
     gemini_models = [
@@ -159,6 +158,10 @@ Draft the response now:"""
 
     res_data = resp.json()
     raw_text = res_data["candidates"][0]["content"]["parts"][0]["text"].strip()
+    # Enforce 50‑word limit
+    words = raw_text.split()
+    if len(words) > 50:
+        raw_text = " ".join(words[:50])
     return raw_text
 
 
@@ -227,14 +230,15 @@ def _predict_risk_score(
     response_model=DraftResponseResult,
     summary="Draft an AI response for a consideration and predict acceptance risk",
 )
-async def draft_response(consideration_id: str):
+async def draft_response(consideration_id: str, force: bool = False):
     """
     1. Fetches the consideration's concern_text and RFI context from Layer 2.
-    2. If a draft already exists in the DB, returns the latest one (no LLM call).
+    2. If a draft already exists in the DB and `force` is False, returns the latest one (no LLM call).
     3. Otherwise calls the Gemini LLM to generate a new draft response.
     4. Runs the risk predictor on the new draft.
     5. Saves the draft + risk score to the ai_draft_response table via Layer 2.
     6. Returns both the draft text and risk score in a single response.
+    7. The response is concise (≤ 50 words) and does not mention the consideration ID.
     """
 
     # Step 1: Fetch consideration details from Layer 2
@@ -252,6 +256,27 @@ async def draft_response(consideration_id: str):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Consideration {consideration_id} not found in Layer 2 (Layer 2 returned {resp.status_code}).",
         )
+
+    # Step 2: Cache check – return latest draft unless forced
+    if not force:
+        try:
+            history_resp = await client.get(f"{LAYER2_URL}/rfi/consideration/{consideration_id}/drafts")
+            previous_drafts = history_resp.json() if history_resp.status_code == 200 else []
+        except Exception:
+            previous_drafts = []
+        if previous_drafts:
+            latest = previous_drafts[-1]
+            logger.info("Cache hit: returning existing draft for consideration %s (draft id: %s)", consideration_id, latest.get("id", "?"))
+            return DraftResponseResult(
+                draft_id=latest.get("id", "cached"),
+                consideration_id=consideration_id,
+                draft_text=latest.get("draft_text", ""),
+                risk_score=latest.get("risk_score") or 0.5,
+                created_at=latest.get("created_at", ""),
+            )
+    # If forced or no cached draft, continue to generate a new one.
+    # Reset previous_drafts variable for later risk prediction
+    previous_drafts = []
 
     consideration_data = resp.json()
     concern_text = consideration_data.get("concern_text", "")

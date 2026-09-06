@@ -62,7 +62,7 @@ const s = {
     flexShrink: 0,
     position: 'sticky',
     top: 0,
-    background: '#ffffff',
+    background: 'var(--bg)',
     zIndex: 50,
     boxShadow: 'var(--shadow-sm)',
   },
@@ -175,6 +175,18 @@ export default function App() {
     stage: 'all',
     category: 'all',
     sort: 'sla_asc',
+    date: '',
+    trialId: '',
+    euCtNumber: '',
+    protocolCode: '',
+    imp: '',
+    therapeuticArea: '',
+    rms: '',
+    trialPhase: 'all',
+    docType: '',
+    proofOfPayment: '',
+    protocol: '',
+    icf: '',
   });
 
   const loadRfis = useCallback(async () => {
@@ -225,6 +237,8 @@ export default function App() {
 
   const displayRfis = useMemo(() => {
     let list = [...rfis];
+
+    // Text search query
     if (filters.query.trim()) {
       const q = filters.query.toLowerCase();
       list = list.filter(r =>
@@ -238,9 +252,125 @@ export default function App() {
         )
       );
     }
+
+    // Country
     if (filters.country !== 'all') list = list.filter(r => r.nca_country === filters.country);
+
+    // Stage
     if (filters.stage !== 'all') list = list.filter(r => (r.workflow_state?.current_stage || r.status) === filters.stage);
+
+    // Category
     if (filters.category !== 'all') list = list.filter(r => r.category === filters.category);
+
+    // Date (submit_date, due_date, or response_date)
+    if (filters.date) {
+      list = list.filter(r =>
+        (r.submit_date && r.submit_date.includes(filters.date)) ||
+        (r.due_date && r.due_date.includes(filters.date)) ||
+        (r.response_date && r.response_date.includes(filters.date))
+      );
+    }
+
+    // Trial ID / EU-CT Number / Protocol Code
+    if (filters.trialId?.trim()) {
+      const q = filters.trialId.trim().toLowerCase();
+      list = list.filter(r =>
+        r.rfi_id?.toLowerCase().includes(q) ||
+        r.source_document_ref?.toLowerCase().includes(q)
+      );
+    }
+
+    if (filters.euCtNumber?.trim()) {
+      const q = filters.euCtNumber.trim().toLowerCase();
+      list = list.filter(r => r.rfi_id?.toLowerCase().includes(q));
+    }
+
+    if (filters.protocolCode?.trim()) {
+      const q = filters.protocolCode.trim().toLowerCase();
+      list = list.filter(r =>
+        r.rfi_id?.toLowerCase().includes(q) ||
+        r.considerations?.some(c => c.ctr_article_name?.toLowerCase().includes(q))
+      );
+    }
+
+    // Investigational Medicinal Product (IMP)
+    if (filters.imp?.trim()) {
+      const q = filters.imp.trim().toLowerCase();
+      list = list.filter(r =>
+        r.rfi_text?.toLowerCase().includes(q) ||
+        r.therapeutic_area_name?.toLowerCase().includes(q) ||
+        r.considerations?.some(c => c.concern_text?.toLowerCase().includes(q))
+      );
+    }
+
+    // Therapeutic Area
+    if (filters.therapeuticArea?.trim()) {
+      const q = filters.therapeuticArea.trim().toLowerCase();
+      list = list.filter(r => r.therapeutic_area_name?.toLowerCase().includes(q));
+    }
+
+    // RMS (Ref Member State / NCA Country)
+    if (filters.rms?.trim()) {
+      const q = filters.rms.trim().toLowerCase();
+      list = list.filter(r => r.nca_country?.toLowerCase().includes(q));
+    }
+
+    // Trial Phase
+    if (filters.trialPhase && filters.trialPhase !== 'all') {
+      const q = filters.trialPhase.toLowerCase();
+      list = list.filter(r =>
+        r.category?.toLowerCase().includes(q) ||
+        r.rfi_text?.toLowerCase().includes(q) ||
+        r.considerations?.some(c => c.concern_text?.toLowerCase().includes(q))
+      );
+    }
+
+    // Document type requested
+    if (filters.docType?.trim()) {
+      const q = filters.docType.trim().toLowerCase();
+      list = list.filter(r =>
+        r.category?.toLowerCase().includes(q) ||
+        r.considerations?.some(c =>
+          c.ctr_article_name?.toLowerCase().includes(q) ||
+          c.concern_text?.toLowerCase().includes(q)
+        )
+      );
+    }
+
+    // Proof of Payment
+    if (filters.proofOfPayment?.trim()) {
+      const q = filters.proofOfPayment.trim().toLowerCase();
+      list = list.filter(r =>
+        r.category?.toLowerCase().includes('payment') ||
+        r.rfi_text?.toLowerCase().includes(q) ||
+        r.considerations?.some(c => c.concern_text?.toLowerCase().includes(q) || c.ctr_article_name?.toLowerCase().includes(q))
+      );
+    }
+
+    // Protocol
+    if (filters.protocol?.trim()) {
+      const q = filters.protocol.trim().toLowerCase();
+      list = list.filter(r =>
+        r.category?.toLowerCase().includes('protocol') ||
+        r.considerations?.some(c =>
+          c.ctr_article_name?.toLowerCase().includes(q) ||
+          c.concern_text?.toLowerCase().includes(q)
+        )
+      );
+    }
+
+    // ICF (Informed Consent)
+    if (filters.icf?.trim()) {
+      const q = filters.icf.trim().toLowerCase();
+      list = list.filter(r =>
+        r.category?.toLowerCase().includes('consent') ||
+        r.considerations?.some(c =>
+          c.ctr_article_name?.toLowerCase().includes(q) ||
+          c.concern_text?.toLowerCase().includes(q)
+        )
+      );
+    }
+
     list.sort(SORT_FNS[filters.sort] || SORT_FNS.sla_asc);
     return list;
   }, [rfis, filters]);
@@ -250,10 +380,8 @@ export default function App() {
       {/* Top Bar */}
       <header style={s.topBar}>
         <div style={s.logoWrap}>
-          <div style={s.logoIcon}>🧬</div>
           <div>
             <div style={s.logo}>ClarION</div>
-            <span style={s.logoSub}>EU CTR Regulatory Intelligence</span>
           </div>
         </div>
 

@@ -189,9 +189,9 @@ export const getRiskFeatureSchema = async () => {
   }
 };
 
-export const draftAiResponse = async (considerationId) => {
+export const draftAiResponse = async (considerationId, force = false) => {
   try {
-    const res = await axios.post(`${LAYER1_URL}/api/draft/${considerationId}`);
+    const res = await axios.post(`${LAYER1_URL}/api/draft/${considerationId}${force ? '?force=true' : ''}`);
     return res.data;
   } catch (err) {
     throw err.response?.data || err;

@@ -2,8 +2,8 @@ import React from 'react';
 
 const S = {
   header: {
-    background: '#0a0a0a',
-    borderBottom: '1px solid #1e1e1e',
+    background: 'var(--bg-sidebar, #0a0a0a)',
+    borderBottom: '1px solid var(--border, #1e1e1e)',
     position: 'sticky',
     top: 0,
     zIndex: 50,
@@ -22,7 +22,7 @@ const S = {
     fontFamily: '"JetBrains Mono", monospace',
     fontWeight: 700,
     fontSize: 15,
-    color: '#fff',
+    color: 'var(--text, #fff)',
     letterSpacing: '-0.02em',
     whiteSpace: 'nowrap',
   },
@@ -35,8 +35,8 @@ const S = {
     fontSize: 12,
     fontWeight: 500,
     transition: 'all 0.15s',
-    background: active ? '#fff' : 'transparent',
-    color: active ? '#000' : '#666',
+    background: active ? 'var(--text, #fff)' : 'transparent',
+    color: active ? 'var(--bg, #000)' : 'var(--text-muted, #666)',
     fontFamily: 'inherit',
   }),
   right: { display: 'flex', alignItems: 'center', gap: 14 },

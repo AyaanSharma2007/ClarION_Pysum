@@ -34,7 +34,7 @@ const s = {
     paddingTop: 4,
   },
   card: (selected) => ({
-    background: selected ? 'var(--accent-blue-light)' : '#ffffff',
+    background: selected ? 'var(--accent-blue-light)' : 'var(--bg-card)',
     border: `1.5px solid ${selected ? 'var(--accent-blue)' : 'var(--border)'}`,
     borderRadius: 'var(--radius-md)',
     padding: '14px 18px',
@@ -128,7 +128,7 @@ const s = {
     whiteSpace: 'nowrap',
   }),
   pendingRow: {
-    background: '#fff',
+    background: 'var(--bg-card)',
     border: '1.5px dashed var(--border)',
     borderRadius: 'var(--radius-md)',
     padding: '14px 18px',
@@ -195,7 +195,7 @@ export default function RfiList({ rfis, pendingUploads, selectedId, onSelect }) 
             style={s.card(isSelected)}
             onClick={() => onSelect(rfi)}
             onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; e.currentTarget.style.borderColor = 'var(--border-hover)'; } }}
-            onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.background = '#fff'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; e.currentTarget.style.borderColor = 'var(--border)'; } }}
+            onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.background = 'var(--bg-card)'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; e.currentTarget.style.borderColor = 'var(--border)'; } }}
           >
             <div style={s.dot(sla.color)} />
 

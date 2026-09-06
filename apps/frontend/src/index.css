@@ -1,1 +1,71 @@
-/* Empty — all styles are in index.html CSS vars + component inline styles */
+/* Global CSS variables for light and dark themes */
+:root {
+  --bg: #f4f6fb;
+  --bg-card: #ffffff;
+  --bg-hover: #f0f4ff;
+  --bg-sidebar: #ffffff;
+  --border: #e4e8f4;
+  --border-hover: #c8d3f0;
+  --text: #1a1d2e;
+  --text-muted: #6b7194;
+  --text-dim: #9ea5c9;
+  --accent-blue: #4f72ff;
+  --accent-blue-light: #e8edff;
+  --accent-pink: #f06292;
+  --accent-pink-light: #fce4ec;
+  --green: #2db87a;
+  --green-light: #e6f7f0;
+  --amber: #f59e0b;
+  --amber-light: #fef3c7;
+  --red: #ef5350;
+  --red-light: #ffebee;
+  --shadow-sm: 0 1px 4px rgba(79,114,255,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 16px rgba(79,114,255,0.10), 0 2px 6px rgba(0,0,0,0.06);
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+}
+
+[data-theme="dark"] {
+  --bg: #090a0f;
+  --bg-card: #12141f;
+  --bg-hover: #1c1f33;
+  --bg-sidebar: #10121d;
+  --border: #23273d;
+  --border-hover: #373d5e;
+  --text: #ffffff;
+  --text-muted: #b0b5d6;
+  --text-dim: #7177a3;
+  --accent-blue: #6d8eff;
+  --accent-blue-light: #182046;
+  --accent-pink: #f48fb1;
+  --accent-pink-light: #321626;
+  --green: #4cde98;
+  --green-light: #0d2c1f;
+  --amber: #ffcc02;
+  --amber-light: #2c2200;
+  --red: #ff7474;
+  --red-light: #331114;
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.5);
+  --shadow-md: 0 4px 20px rgba(0,0,0,0.7);
+}
+
+/* Ensure inputs, selects and textareas pick up dark styles */
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background-color: var(--bg-card) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: var(--text-dim) !important;
+}
+
+[data-theme="dark"] select option {
+  background-color: #12141f;
+  color: #ffffff;
+}
+
