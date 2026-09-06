@@ -3,10 +3,12 @@ import React, { useMemo } from 'react';
 const STAGES = [
   { value: 'all', label: 'All Stages' },
   { value: 'received', label: 'Received' },
-  { value: 'RA_Clinical_Review', label: 'RA Review' },
-  { value: 'CTA_Mgmt_Review', label: 'CTA Review' },
-  { value: 'EU_Hub_Approval', label: 'EU Approval' },
-  { value: 'Submitted', label: 'Submitted' },
+  { value: 'ready_for_response', label: 'Ready for Response' },
+  { value: 'awaiting_response', label: 'Awaiting Response' },
+  { value: 'drafting', label: 'Drafting' },
+  { value: 'pending_approval', label: 'Pending Approval' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'submitted', label: 'Submitted' },
 ];
 
 const CATEGORIES = [

@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { advanceRfiStage, predictDossierRisk, searchSemantic } from '../services/api';
 
-const STAGE_ORDER = ['received', 'RA_Clinical_Review', 'CTA_Mgmt_Review', 'EU_Hub_Approval', 'Submitted'];
+const STAGE_ORDER = ['received', 'ready_for_response', 'awaiting_response', 'drafting', 'pending_approval', 'approved', 'submitted'];
 const STAGE_LABELS = {
   received: 'Received',
-  RA_Clinical_Review: 'RA Clinical Review',
-  CTA_Mgmt_Review: 'CTA Management Review',
-  EU_Hub_Approval: 'EU Hub Approval',
-  Submitted: 'Submitted',
+  ready_for_response: 'Ready for Response',
+  awaiting_response: 'Awaiting Response',
+  drafting: 'Drafting',
+  pending_approval: 'Pending Approval',
+  approved: 'Approved',
+  submitted: 'Submitted',
 };
 
 const RISK_LABELS = {

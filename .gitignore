@@ -14,11 +14,11 @@ __pycache__/
 *$py.class
 venv/
 .venv/
-.env
+# .env
 
 # Environment & OS
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# .env.local
+# .env.development.local
+# .env.test.local
+# .env.production.local
 .DS_Store
