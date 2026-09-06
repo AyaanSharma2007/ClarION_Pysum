@@ -261,7 +261,7 @@ export default function MedicalWritingView() {
     navigator.clipboard.writeText(responseText);
     setCopiedId(id);
     setDraftText(responseText);
-    setCopiedToast('✓ Precedent copied to draft editor & clipboard!');
+    setCopiedToast(' Precedent copied to draft editor & clipboard!');
     setTimeout(() => {
       setCopiedId(null);
       setCopiedToast('');
@@ -270,13 +270,13 @@ export default function MedicalWritingView() {
 
   return (
     <div style={s.page}>
-      {/* ── Top Header ── */}
+      {/*  Top Header  */}
       <div style={s.headerBox}>
         <div style={s.heading}>Medical Writing & Recommender Dashboard</div>
         <div style={s.sub}>Query historical regulatory precedents and draft responses</div>
       </div>
 
-      {/* ── Search Input Bar ── */}
+      {/*  Search Input Bar  */}
       <div style={s.searchBar}>
         <input
           style={s.input}
@@ -294,13 +294,13 @@ export default function MedicalWritingView() {
         </button>
       </div>
 
-      {/* ── Meta Status Bar ── */}
+      {/*  Meta Status Bar  */}
       <div style={s.meta}>
         <span>{searched ? `${results.length} relevant precedents found` : ''}</span>
         {copiedToast && <span style={{ color: '#4ade80', fontWeight: 600 }}>{copiedToast}</span>}
       </div>
 
-      {/* ── Results Container ── */}
+      {/*  Results Container  */}
       {searched && (
         <div style={s.resultsList}>
           {results.map((item, i) => {
@@ -313,16 +313,16 @@ export default function MedicalWritingView() {
                 <div style={s.cardHead}>
                   <span style={s.cardId}>{item.id}</span>
                   <div style={s.badgeRow}>
-                    {item.louvainTag && <span style={s.louvainTag}>🕸️ {item.louvainTag}</span>}
+                    {item.louvainTag && <span style={s.louvainTag}>️ {item.louvainTag}</span>}
                     <span style={s.scoreBadge(item.score)}>{scorePct}% Similarity</span>
                   </div>
                 </div>
 
                 <div style={s.badgeRow}>
-                  {item.msc && <span style={s.contextTag}>📍 {item.msc}</span>}
+                  {item.msc && <span style={s.contextTag}> {item.msc}</span>}
                   {item.indication && <span style={s.contextTag}>🩺 {item.indication}</span>}
-                  {item.article && <span style={s.contextTag}>📄 {item.article}</span>}
-                  {item.centrality && <span style={s.contextTag}>⚡ Centrality: {item.centrality}</span>}
+                  {item.article && <span style={s.contextTag}> {item.article}</span>}
+                  {item.centrality && <span style={s.contextTag}> Centrality: {item.centrality}</span>}
                 </div>
 
                 {item.concern && (
@@ -343,7 +343,7 @@ export default function MedicalWritingView() {
                   style={s.copyBtn(isCopied)}
                   onClick={() => handleCopy(cardId, item.response)}
                 >
-                  {isCopied ? '✓ Copied to Draft' : 'Copy Precedent'}
+                  {isCopied ? ' Copied to Draft' : 'Copy Precedent'}
                 </button>
               </div>
             );
@@ -351,11 +351,11 @@ export default function MedicalWritingView() {
         </div>
       )}
 
-      {/* ── Draft Response Workspace ── */}
+      {/*  Draft Response Workspace  */}
       <div style={s.draftPanel}>
         <div style={s.draftHead}>
           <div style={s.draftTitle}>
-            <span>✍️ Medical Writer Response Workbench</span>
+            <span>️ Medical Writer Response Workbench</span>
             <span style={{ fontSize: 11, color: '#555', fontWeight: 400 }}>(One-click copied precedents populate here)</span>
           </div>
           <button
@@ -370,7 +370,7 @@ export default function MedicalWritingView() {
             }}
             onClick={() => {
               navigator.clipboard.writeText(draftText);
-              setCopiedToast('✓ Draft copied to clipboard!');
+              setCopiedToast(' Draft copied to clipboard!');
               setTimeout(() => setCopiedToast(''), 2000);
             }}
           >

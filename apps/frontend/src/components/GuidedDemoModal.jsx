@@ -85,7 +85,7 @@ export default function GuidedDemoModal({ onClose, setActiveRole }) {
             <div style={s.step}>Guided Demo · {step + 1} of {STEPS.length}</div>
             <div style={s.title}>{current.title}</div>
           </div>
-          <button style={s.closeBtn} onClick={onClose}>✕</button>
+          <button style={s.closeBtn} onClick={onClose}></button>
         </div>
 
         {/* Progress */}

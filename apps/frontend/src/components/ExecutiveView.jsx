@@ -120,7 +120,7 @@ export default function ExecutiveView({ rfis }) {
         <div style={s.panel}>
           <div style={s.panelHead}>
             <span style={s.panelTitle}>{selected?.rfi_id ?? 'Select an RFI'}</span>
-            {chain && <span style={s.badge}>✓ Integrity verified</span>}
+            {chain && <span style={s.badge}> Integrity verified</span>}
           </div>
 
           {loading ? (

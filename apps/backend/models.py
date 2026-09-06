@@ -99,26 +99,7 @@ class RFIExtractionTemplate(BaseModel):
     """
     model_config = {
         "populate_by_name": True,
-        "str_strip_whitespace": True,
-        "json_schema_extra": {
-            "example": {
-                "rfi_id": "CT-2024-123456-12-00-SM01-001",
-                "due_date": "2026-03-16",
-                "response_date": "2026-03-06",
-                "submit_date": "2026-03-05",
-                "msc": {"country": "Germany"},
-                "indication": {"name": "Type 2 Diabetes Mellitus"},
-                "considerations": [
-                    {
-                        "number": 1,
-                        "concern_text": "Please provide evidence that...",
-                        "ctr_article": {"name": "Part I - Regulatory / Annex I, Section 63"},
-                        "response": None,
-                        "outcome": None
-                    }
-                ]
-            }
-        }
+        "str_strip_whitespace": True
     }
 
     @model_validator(mode='before')

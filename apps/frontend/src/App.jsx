@@ -224,6 +224,8 @@ export default function App() {
     } catch (e) {
       console.error('[App] PDF upload/ingest failed:', e);
       setPendingUploads(prev => prev.filter(p => p.id !== pendingId));
+      setError(e.detail || 'try again');
+      setTimeout(() => setError(null), 3000); // Clear error after 3s for minimalist feel
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -391,7 +393,7 @@ export default function App() {
           onClick={toggleTheme}
           title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
         >
-          {theme === 'light' ? '🌙 Dark' : '☀️ Light'}
+          {theme === 'light' ? ' Dark' : '️ Light'}
         </button>
 
         <button
@@ -402,7 +404,7 @@ export default function App() {
           onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.borderColor = 'var(--border-hover)'; }}
           onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'var(--border)'; }}
         >
-          ↻ Refresh
+           Refresh
         </button>
 
         <input
@@ -422,7 +424,7 @@ export default function App() {
           onMouseEnter={e => { if (!uploading) e.currentTarget.style.boxShadow = '0 4px 20px rgba(79,114,255,0.45)'; }}
           onMouseLeave={e => { if (!uploading) e.currentTarget.style.boxShadow = '0 2px 12px rgba(79,114,255,0.30)'; }}
         >
-          {uploading ? '⏳ Processing…' : '↑  Upload RFI'}
+          {uploading ? ' Processing…' : '  Upload RFI'}
         </button>
       </header>
 
@@ -430,7 +432,7 @@ export default function App() {
       <main style={s.main}>
         {error && (
           <div style={s.errorBanner}>
-            <span>⚠</span> {error}
+            <span></span> {error}
           </div>
         )}
 
@@ -443,7 +445,7 @@ export default function App() {
 
         {loading ? (
           <div style={s.loadingRow}>
-            <span style={{ fontSize: 22, animation: 'spin 1.2s linear infinite', display: 'inline-block' }}>⏳</span>
+            <span style={{ fontSize: 22, animation: 'spin 1.2s linear infinite', display: 'inline-block' }}></span>
             Loading RFIs…
           </div>
         ) : (

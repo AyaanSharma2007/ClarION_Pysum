@@ -3,12 +3,10 @@ import React, { useMemo } from 'react';
 const STAGES = [
   { value: 'all', label: 'All Stages' },
   { value: 'received', label: 'Received' },
-  { value: 'ready_for_response', label: 'Ready for Response' },
-  { value: 'awaiting_response', label: 'Awaiting Response' },
-  { value: 'drafting', label: 'Drafting' },
-  { value: 'pending_approval', label: 'Pending Approval' },
-  { value: 'approved', label: 'Approved' },
-  { value: 'submitted', label: 'Submitted' },
+  { value: 'RA_Clinical_Review', label: 'RA Review' },
+  { value: 'CTA_Mgmt_Review', label: 'CTA Review' },
+  { value: 'EU_Hub_Approval', label: 'EU Approval' },
+  { value: 'Submitted', label: 'Submitted' },
 ];
 
 const CATEGORIES = [
@@ -114,7 +112,7 @@ export default function FilterBar({ filters, setFilters, countries, resultCount 
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 0 10px' }}>
       <div style={s.bar}>
         <div style={s.searchWrap}>
-          <span style={s.searchIcon}>🔍</span>
+          <span style={s.searchIcon}></span>
           <input
             id="rfi-search"
             style={s.search}
@@ -157,7 +155,7 @@ export default function FilterBar({ filters, setFilters, countries, resultCount 
           }}
           onClick={() => setExpanded(!expanded)}
         >
-          <span>⚙ Filters</span>
+          <span> Filters</span>
           {activeExtraFiltersCount > 0 && (
             <span style={{
               background: 'var(--accent-blue)',
@@ -169,7 +167,7 @@ export default function FilterBar({ filters, setFilters, countries, resultCount 
               {activeExtraFiltersCount}
             </span>
           )}
-          <span>{expanded ? '▲' : '▼'}</span>
+          <span>{expanded ? '' : '▼'}</span>
         </button>
 
         <div style={s.countBadge}>{resultCount} RFI{resultCount !== 1 ? 's' : ''}</div>

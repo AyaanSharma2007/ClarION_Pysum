@@ -13,9 +13,9 @@ const EvidenceIntegrityPanel = ({ data }) => {
           <div key={key} className="flex justify-between items-center py-1 border-b border-slate-800/50">
             <span className="text-slate-400">{key}</span>
             {passed ? (
-              <span className="text-emerald-500 font-bold">✓</span>
+              <span className="text-emerald-500 font-bold"></span>
             ) : (
-              <span className="text-rose-500 font-bold">✗</span>
+              <span className="text-rose-500 font-bold"></span>
             )}
           </div>
         ))}

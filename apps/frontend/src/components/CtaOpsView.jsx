@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { parsePdfLayer1, ingestRfiLayer1 } from '../services/api';
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+//  Styles 
 const s = {
   page: { 
     padding: '40px 0', 
@@ -99,7 +99,7 @@ const s = {
   })
 };
 
-// ─── Component ────────────────────────────────────────────────────────────────
+//  Component 
 export default function CtaOpsView() {
   const [file, setFile] = useState(null);
   const [dragOver, setDragOver] = useState(false);
@@ -174,7 +174,7 @@ export default function CtaOpsView() {
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
       >
-        <div style={s.dropIcon}>{parsing ? '⏳' : '📄'}</div>
+        <div style={s.dropIcon}>{parsing ? '' : ''}</div>
         <div style={s.dropLabel}>
           {parsing ? 'Extracting Data...' : (file ? file.name : 'PDF Intake')}
         </div>

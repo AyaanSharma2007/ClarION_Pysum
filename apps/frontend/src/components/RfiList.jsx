@@ -62,11 +62,11 @@ const s = {
     flexWrap: 'wrap',
   },
   rfiId: {
-    fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 11,
+    fontSize: 12,
     color: 'var(--text)',
-    fontWeight: 700,
+    fontWeight: 600,
     flexShrink: 0,
+    letterSpacing: '0.02em',
   },
   category: {
     fontSize: 10,
@@ -164,7 +164,7 @@ export default function RfiList({ rfis, pendingUploads, selectedId, onSelect }) 
     return (
       <div style={s.list}>
         <div style={s.empty}>
-          <div style={s.emptyIcon}>📋</div>
+          <div style={s.emptyIcon}></div>
           No RFIs found. Upload a PDF to get started.
         </div>
       </div>
@@ -175,7 +175,7 @@ export default function RfiList({ rfis, pendingUploads, selectedId, onSelect }) 
     <div style={s.list}>
       {pendingUploads.map(p => (
         <div key={p.id} style={s.pendingRow}>
-          <span style={{ fontSize: 18, animation: 'spin 1.2s linear infinite', display: 'inline-block' }}>⏳</span>
+          <div style={{ width: 18, height: 18, border: '2.5px solid var(--border)', borderTopColor: 'var(--accent-blue)', borderRadius: '50%', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
           <div>
             <div style={s.pendingName}>{p.filename}</div>
             <div style={s.pendingText}>Parsing & ingesting — this may take a moment…</div>
@@ -206,7 +206,6 @@ export default function RfiList({ rfis, pendingUploads, selectedId, onSelect }) 
                 <span style={s.indication}>{rfi.therapeutic_area_name || '—'}</span>
               </div>
               <div style={s.bottomRow}>
-                <span style={s.country}>🌍 {rfi.nca_country || '—'}</span>
                 <span style={s.stagePill}>{STAGE_LABELS[stage] || stage}</span>
                 {rfi.considerations?.length > 0 && (
                   <span style={s.consCount}>

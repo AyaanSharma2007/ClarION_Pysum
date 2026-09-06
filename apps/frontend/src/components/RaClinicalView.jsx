@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { advanceRfiStage, submitCategoryCorrection } from '../services/api';
 
-// ─── Styles ─────────────────────────────────────────────────────────────────
+//  Styles 
 const s = {
   page: { padding: '28px 0', display: 'flex', flexDirection: 'column', gap: 20 },
   statsRow: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 },
@@ -57,7 +57,7 @@ const s = {
 const STAGES = ['Received', 'RA_Clinical_Review', 'CTA_Mgmt_Review', 'EU_Hub_Approval', 'Submitted'];
 const ALCOA = ['Attributable', 'Legible', 'Contemporaneous', 'Original', 'Accurate', 'Complete', 'Consistent', 'Enduring', 'Available'];
 
-// ─── SLA Countdown ────────────────────────────────────────────────────────────
+//  SLA Countdown 
 function SlaTimer({ dueDate, type = '72h' }) {
   const [remaining, setRemaining] = useState('');
   const [pct, setPct] = useState(100);
@@ -90,7 +90,7 @@ function SlaTimer({ dueDate, type = '72h' }) {
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+//  Main Component 
 export default function RaClinicalView({ rfis, onRefresh }) {
   const [selected, setSelected] = useState(rfis[0] || null);
   const [advancing, setAdvancing] = useState(false);
@@ -128,7 +128,7 @@ export default function RaClinicalView({ rfis, onRefresh }) {
 
   return (
     <div style={s.page}>
-      {/* ── Stats ── */}
+      {/*  Stats  */}
       <div style={s.statsRow}>
         <div style={s.stat}>
           <div style={s.statLabel}>Active RFIs</div>
@@ -152,13 +152,13 @@ export default function RaClinicalView({ rfis, onRefresh }) {
         </div>
       </div>
 
-      {/* ── Queue + Inspector ── */}
+      {/*  Queue + Inspector  */}
       <div style={s.grid}>
         {/* Queue Table */}
         <div style={s.panel}>
           <div style={s.panelHead}>
             <span style={s.panelTitle}>Regulatory Queue</span>
-            <button style={s.iconBtn} onClick={onRefresh} title="Refresh">↻ Refresh</button>
+            <button style={s.iconBtn} onClick={onRefresh} title="Refresh"> Refresh</button>
           </div>
           <table style={s.table}>
             <thead>
@@ -258,7 +258,7 @@ export default function RaClinicalView({ rfis, onRefresh }) {
                     <button style={s.saveBtn} onClick={saveCorrection}>Submit Correction</button>
                   </div>
                 )}
-                {corrSaved && <div style={{ ...s.msg, marginTop: 6 }}>✓ Correction captured for LoRA fine-tuning</div>}
+                {corrSaved && <div style={{ ...s.msg, marginTop: 6 }}> Correction captured for LoRA fine-tuning</div>}
               </div>
 
               {/* Sponsor response */}
@@ -278,10 +278,10 @@ export default function RaClinicalView({ rfis, onRefresh }) {
                   <span style={s.badge('green')}>9/9 Verified</span>
                 </div>
                 <div style={s.alcoa}>
-                  {ALCOA.map(d => <span key={d} style={s.alcoaItem}>✓ {d}</span>)}
+                  {ALCOA.map(d => <span key={d} style={s.alcoaItem}> {d}</span>)}
                 </div>
                 <div style={s.hashCheck}>
-                  🔒 SHA-256 Hash Chain: <span style={{ color: '#4ade80' }}>Verified Valid</span> (Genesis → Current Stage)
+                   SHA-256 Hash Chain: <span style={{ color: '#4ade80' }}>Verified Valid</span> (Genesis → Current Stage)
                 </div>
               </div>
 
