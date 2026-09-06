@@ -9,8 +9,8 @@
   "scripts": {
     "setup": "bash scripts/setup.sh",
     "dev": "concurrently -n \"LAYER2,BACKEND,FRONTEND\" -c \"magenta,cyan,green\" \"npm run dev:layer2\" \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:backend": "bash -c 'test -d .venv || bash scripts/setup.sh; cd apps/backend && ../../.venv/bin/uvicorn main:app --reload --port 8000'",
-    "dev:layer2": "bash -c 'test -d .venv || bash scripts/setup.sh; cd LAYER2/layer2 && ../../.venv/bin/uvicorn app.main:app --reload --port 8001'",
+    "dev:backend": "bash -c 'test -d .venv || bash scripts/setup.sh; cd apps/backend && ../../.venv/bin/uvicorn main:app --reload --host 0.0.0.0 --port 8000'",
+    "dev:layer2": "bash -c 'test -d .venv || bash scripts/setup.sh; cd LAYER2/layer2 && ../../.venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 8001'",
     "dev:frontend": "npm run dev --prefix apps/frontend",
     "build:frontend": "npm run build --prefix apps/frontend",
     "lint:frontend": "npm run lint --prefix apps/frontend"

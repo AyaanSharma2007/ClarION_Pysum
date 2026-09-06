@@ -26,37 +26,22 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-<<<<<<< HEAD
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-=======
-from fastapi import APIRouter, Depends, HTTPException, status
->>>>>>> main
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-<<<<<<< HEAD
 from LAYER2.layer2.app.config import settings
 from LAYER2.layer2.app.database import get_db
 from LAYER2.layer2.app.models.audit import AuditLog, WorkflowState
 from LAYER2.layer2.app.models.rfi import (
-=======
-from app.config import settings
-from app.database import get_db
-from app.models.audit import AuditLog, WorkflowState
-from app.models.rfi import (
->>>>>>> main
     CTRArticle,
     Consideration,
     NCA,
     RFI,
     TherapeuticArea,
 )
-<<<<<<< HEAD
 from LAYER2.layer2.app.schemas.rfi import (
-=======
-from app.schemas.rfi import (
->>>>>>> main
     AuditLogRead,
     AuditTrailRead,
     BatchIngestResult,
@@ -68,16 +53,10 @@ from app.schemas.rfi import (
     StageAdvanceRequest,
     VALID_STAGES,
 )
-<<<<<<< HEAD
 from LAYER2.layer2.app.services.embedding import embedding_service
 from LAYER2.layer2.app.services.extraction import extraction_service
 from LAYER2.layer2.app.utils.audit import compute_hash, verify_chain
 from LAYER2.layer2.app.utils.safety_gateway import screen_untrusted_text
-=======
-from app.services.embedding import embedding_service
-from app.services.extraction import extraction_service
-from app.utils.audit import compute_hash, verify_chain
->>>>>>> main
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/rfi", tags=["Ingestion"])
@@ -161,7 +140,6 @@ async def _ingest_one(db: AsyncSession, payload: RFICreate) -> RFI:
     if existing.scalar_one_or_none() is not None:
         raise ValueError(f"Duplicate rfi_id: {payload.rfi_id!r}")
 
-<<<<<<< HEAD
     # ── 0b. Safety Gateway (Bible §6.2) ─────────────────────────────────────
     # Screen all untrusted text fields before they reach DB or LLM pipeline.
     all_text_parts = []
@@ -184,8 +162,6 @@ async def _ingest_one(db: AsyncSession, payload: RFICreate) -> RFI:
                 f"Matched patterns: {screen_result['matched_patterns']}"
             )
 
-=======
->>>>>>> main
     # ── 1. Upsert dimension tables ───────────────────────────────────────────
     nca = await _upsert_nca(db, payload.msc.country)
     ta = await _upsert_therapeutic_area(db, payload.indication.name)
@@ -213,12 +189,9 @@ async def _ingest_one(db: AsyncSession, payload: RFICreate) -> RFI:
     # ── 5. Insert RFI row ────────────────────────────────────────────────────
     rfi = RFI(
         rfi_id=payload.rfi_id,
-<<<<<<< HEAD
         rfi_type=getattr(payload, 'rfi_type', None),
         status="received",
         source_document_ref=getattr(payload, 'source_document_ref', None),
-=======
->>>>>>> main
         due_date=payload.due_date,
         response_date=payload.response_date,
         submit_date=payload.submit_date,
@@ -272,11 +245,7 @@ async def _ingest_one(db: AsyncSession, payload: RFICreate) -> RFI:
     # ── 7. Initialise WorkflowState ──────────────────────────────────────────
     workflow = WorkflowState(
         rfi_id=rfi.id,
-<<<<<<< HEAD
         current_stage="received",
-=======
-        current_stage="Received",
->>>>>>> main
         stage_entered_at=datetime.now(tz=timezone.utc),
         sla_due_at=_sla_due_at(),
     )
@@ -311,19 +280,13 @@ def _to_rfi_read(rfi: RFI) -> RFIRead:
         ConsiderationRead(
             id=c.id,
             number=c.number,
-<<<<<<< HEAD
             consideration_id_str=c.consideration_id_str,
-=======
->>>>>>> main
             concern_text=c.concern_text,
             ctr_article_name=c.ctr_article.name if c.ctr_article else None,
             response_text=c.response_text,
             outcome_status=c.outcome_status,
-<<<<<<< HEAD
             cluster_id=c.cluster_id,
             is_hub_article=c.is_hub_article,
-=======
->>>>>>> main
         )
         for c in (rfi.considerations or [])
     ]
@@ -333,21 +296,15 @@ def _to_rfi_read(rfi: RFI) -> RFIRead:
             current_stage=rfi.workflow_state.current_stage,
             stage_entered_at=rfi.workflow_state.stage_entered_at,
             sla_due_at=rfi.workflow_state.sla_due_at,
-<<<<<<< HEAD
             approved_by=rfi.workflow_state.approved_by,
             approved_at=rfi.workflow_state.approved_at,
-=======
->>>>>>> main
         )
     return RFIRead(
         id=rfi.id,
         rfi_id=rfi.rfi_id,
-<<<<<<< HEAD
         rfi_type=rfi.rfi_type,
         status=rfi.status,
         source_document_ref=rfi.source_document_ref,
-=======
->>>>>>> main
         due_date=rfi.due_date,
         response_date=rfi.response_date,
         submit_date=rfi.submit_date,
@@ -495,7 +452,6 @@ async def advance_stage(
 
     old_stage = rfi.workflow_state.current_stage if rfi.workflow_state else "Unknown"
 
-<<<<<<< HEAD
     # ── GATE-001 enforcement (Bible §6.4) ─────────────────────────────────────
     # The 'submitted' status is unreachable without a non-null approved_by.
     # Checked at the data write layer, not just in the UI.
@@ -509,19 +465,14 @@ async def advance_stage(
                 ),
             )
 
-=======
->>>>>>> main
     # Update WorkflowState
     rfi.workflow_state.current_stage = body.stage
     rfi.workflow_state.stage_entered_at = datetime.now(tz=timezone.utc)
     rfi.workflow_state.sla_due_at = _sla_due_at()
 
-<<<<<<< HEAD
     # Sync rfi.status with workflow stage (Bible §7 status enum)
     rfi.status = body.stage
 
-=======
->>>>>>> main
     # Hash-chain: find the last audit entry's hash
     last_hash: Optional[str] = None
     if rfi.audit_logs:
@@ -622,7 +573,6 @@ async def get_audit_trail(
     )
 
 
-<<<<<<< HEAD
 # ─── Local PDF Extraction (Bible §4, §13) ─────────────────────────────────────
 
 
@@ -671,5 +621,3 @@ async def parse_pdf_local(file: UploadFile = File(...)):
         "method": "local_pdfplumber",
         "data": result,
     }
-=======
->>>>>>> main

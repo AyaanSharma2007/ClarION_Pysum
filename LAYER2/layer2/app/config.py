@@ -19,7 +19,6 @@ class Settings(BaseSettings):
     # Sync URL is needed by Alembic (psycopg3 driver instead of asyncpg)
     @property
     def SYNC_DATABASE_URL(self) -> str:
-<<<<<<< HEAD
         from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
         url = self.DATABASE_URL.replace(
             "postgresql+asyncpg://", "postgresql+psycopg://"
@@ -32,11 +31,6 @@ class Settings(BaseSettings):
             new_query = urlencode(params, doseq=True)
             url = urlunparse(parsed._replace(query=new_query))
         return url
-=======
-        return self.DATABASE_URL.replace(
-            "postgresql+asyncpg://", "postgresql+psycopg://"
-        )
->>>>>>> main
 
     # ── Embeddings ────────────────────────────────────────────────────────────
     EMBEDDING_BACKEND: Literal["sentence_transformers", "voyage", "dummy", "stub"] = (
@@ -64,7 +58,6 @@ class Settings(BaseSettings):
     NEO4J_PASSWORD: str | None = None
     NEO4J_DATABASE: str = "neo4j"
 
-<<<<<<< HEAD
     # ── OPA Policy Engine (Bible §6.1) ────────────────────────────────────────
     # Fail-closed always. No environment-based toggle.
     # Rules being iterated on are excluded by ID via DISABLED_RULES (with
@@ -72,8 +65,6 @@ class Settings(BaseSettings):
     OPA_URL: str = "http://localhost:8181"
     DISABLED_RULES: list[str] = []
 
-=======
->>>>>>> main
     # ── Workflow ──────────────────────────────────────────────────────────────
     SLA_HOURS_DEFAULT: int = 72
 

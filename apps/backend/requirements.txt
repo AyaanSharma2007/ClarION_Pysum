@@ -20,3 +20,4 @@ shap>=0.45.0             # TreeExplainer — mandatory SHAP explainability (§9 
 numpy>=1.26.0            # Feature array construction
 joblib>=1.3.0            # Model artefact persistence / reload
 pytest>=8.0.0            # Test suite for Layer 4 invariants
+pymupdf>=1.23.0          # Local PDF text extraction

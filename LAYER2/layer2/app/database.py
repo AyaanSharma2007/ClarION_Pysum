@@ -11,11 +11,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import DeclarativeBase
 
-<<<<<<< HEAD
 from LAYER2.layer2.app.config import settings
-=======
-from app.config import settings
->>>>>>> main
 
 
 engine = create_async_engine(

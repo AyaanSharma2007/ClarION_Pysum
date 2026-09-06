@@ -25,11 +25,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-<<<<<<< HEAD
 from LAYER2.layer2.app.config import settings
-=======
-from app.config import settings
->>>>>>> main
 
 logger = logging.getLogger(__name__)
 

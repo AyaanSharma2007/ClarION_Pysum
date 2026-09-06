@@ -15,10 +15,7 @@ from typing import Optional
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
-<<<<<<< HEAD
     Boolean,
-=======
->>>>>>> main
     Date,
     DateTime,
     Float,
@@ -27,19 +24,12 @@ from sqlalchemy import (
     String,
     Text,
     func,
-<<<<<<< HEAD
     text,
-=======
->>>>>>> main
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-<<<<<<< HEAD
 from LAYER2.layer2.app.database import Base
-=======
-from app.database import Base
->>>>>>> main
 
 
 # ─── Lookup / dimension tables ─────────────────────────────────────────────────
@@ -141,7 +131,6 @@ class RFI(Base):
         String(100), unique=True, nullable=False, index=True
     )
 
-<<<<<<< HEAD
     # ── Bible §7 — RFI type and status ──────────────────────────────────────
     rfi_type: Mapped[Optional[str]] = mapped_column(
         String(20), nullable=True,
@@ -156,8 +145,6 @@ class RFI(Base):
         comment="Evidence Integrity 'Original' dimension — Bible §6.3",
     )
 
-=======
->>>>>>> main
     # ── Dates from extraction schema ────────────────────────────────────────
     due_date: Mapped[Optional[date]] = mapped_column(Date)
     response_date: Mapped[Optional[date]] = mapped_column(Date)
@@ -209,15 +196,12 @@ class RFI(Base):
         cascade="all, delete-orphan",
         order_by="AuditLog.created_at",
     )
-<<<<<<< HEAD
     policy_overrides: Mapped[list["PolicyOverride"]] = relationship(
         "PolicyOverride",
         back_populates="rfi",
         cascade="all, delete-orphan",
         order_by="PolicyOverride.overridden_at",
     )
-=======
->>>>>>> main
 
 
 # ─── Consideration ─────────────────────────────────────────────────────────────
@@ -275,7 +259,6 @@ class Consideration(Base):
         UUID(as_uuid=True), ForeignKey("ctr_article.id"), index=True
     )
 
-<<<<<<< HEAD
     # ── Bible §8.6 — Graph analytics fed back from Neo4j ────────────────────
     cluster_id: Mapped[Optional[int]] = mapped_column(
         Integer, nullable=True,
@@ -286,8 +269,6 @@ class Consideration(Base):
         comment="Hub-article flag from Neo4j — Bible §8.6",
     )
 
-=======
->>>>>>> main
     rfi: Mapped["RFI"] = relationship("RFI", back_populates="considerations")
     ctr_article: Mapped[Optional["CTRArticle"]] = relationship(
         "CTRArticle", back_populates="considerations"
@@ -365,8 +346,4 @@ class ResponseComponentVersion(Base):
 
 # ─── Audit + Workflow (imported here to satisfy SQLAlchemy mapper) ─────────────
 # Defined in audit.py, imported so Base.metadata sees all tables.
-<<<<<<< HEAD
 from LAYER2.layer2.app.models.audit import AuditLog, WorkflowState  # noqa: E402, F401
-=======
-from app.models.audit import AuditLog, WorkflowState  # noqa: E402, F401
->>>>>>> main

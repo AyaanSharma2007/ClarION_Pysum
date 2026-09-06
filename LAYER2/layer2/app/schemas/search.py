@@ -6,11 +6,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
-<<<<<<< HEAD
 from LAYER2.layer2.app.schemas.rfi import RFIRead
-=======
-from app.schemas.rfi import RFIRead
->>>>>>> main
 
 
 class SearchFilters(BaseModel):

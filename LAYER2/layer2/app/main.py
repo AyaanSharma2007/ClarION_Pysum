@@ -17,7 +17,10 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
-<<<<<<< HEAD
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+
 from LAYER2.layer2.app.routers import governance, ingest
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,15 +31,6 @@ from LAYER2.layer2.app.services.embedding import embedding_service
 from LAYER2.layer2.app.services.neo4j_service import neo4j_service
 from LAYER2.layer2.app.services.policy_engine import policy_engine
 from LAYER2.layer2.app.services.sla_worker import sla_worker
-=======
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
-from app.config import settings
-from app.routers import ingest, search as search_router
-from app.services.embedding import embedding_service
-from app.services.neo4j_service import neo4j_service
->>>>>>> main
 
 logging.basicConfig(
     level=settings.LOG_LEVEL,
@@ -56,16 +50,12 @@ async def lifespan(app: FastAPI):
     await embedding_service.initialize()
     logger.info("Embedding service ready.")
     await neo4j_service.initialize()
-<<<<<<< HEAD
     await policy_engine.initialize()
     logger.info("Policy engine ready (OPA: %s).", settings.OPA_URL)
     sla_worker.start()
     yield
     await sla_worker.stop()
     await policy_engine.close()
-=======
-    yield
->>>>>>> main
     await neo4j_service.close()
     logger.info("RFI Nexus Layer 2 shutting down.")
 
@@ -97,12 +87,9 @@ app.add_middleware(
 )
 
 # ── Routers ───────────────────────────────────────────────────────────────────
-<<<<<<< HEAD
 # Governance first: its /rfi/export and GET /rfi must be matched before
 # ingest's /rfi/{rfi_uuid} parameterized route.
 app.include_router(governance.router)
-=======
->>>>>>> main
 app.include_router(ingest.router)
 app.include_router(search_router.router)
 

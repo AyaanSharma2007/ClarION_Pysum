@@ -13,17 +13,10 @@ from sqlalchemy import DateTime, ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-<<<<<<< HEAD
 from LAYER2.layer2.app.database import Base
 
 if TYPE_CHECKING:
     from LAYER2.layer2.app.models.rfi import RFI
-=======
-from app.database import Base
-
-if TYPE_CHECKING:
-    from app.models.rfi import RFI
->>>>>>> main
 
 
 class WorkflowState(Base):
@@ -54,7 +47,6 @@ class WorkflowState(Base):
         DateTime(timezone=True)
     )
 
-<<<<<<< HEAD
     # ── Bible §6.4 — Submission Gate (GATE-001) ─────────────────────────────
     # A response may not have a submitted_at timestamp without a recorded
     # human approval event. These fields enforce that invariant.
@@ -67,8 +59,6 @@ class WorkflowState(Base):
         comment="When approval happened",
     )
 
-=======
->>>>>>> main
     rfi: Mapped["RFI"] = relationship("RFI", back_populates="workflow_state")
 
 
@@ -111,7 +101,6 @@ class AuditLog(Base):
     )
 
     rfi: Mapped["RFI"] = relationship("RFI", back_populates="audit_logs")
-<<<<<<< HEAD
 
 
 class PolicyOverride(Base):
@@ -191,5 +180,3 @@ class ExtractionCorrection(Base):
     corrected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-=======
->>>>>>> main

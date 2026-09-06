@@ -35,28 +35,17 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-<<<<<<< HEAD
 from LAYER2.layer2.app.database import get_db
 from LAYER2.layer2.app.models.audit import WorkflowState
 from LAYER2.layer2.app.models.rfi import (
-=======
-from app.database import get_db
-from app.models.audit import WorkflowState
-from app.models.rfi import (
->>>>>>> main
     CTRArticle,
     Consideration,
     NCA,
     RFI,
     TherapeuticArea,
 )
-<<<<<<< HEAD
 from LAYER2.layer2.app.routers.ingest import _load_options, _to_rfi_read
 from LAYER2.layer2.app.schemas.search import (
-=======
-from app.routers.ingest import _load_options, _to_rfi_read
-from app.schemas.search import (
->>>>>>> main
     HybridSearchRequest,
     HybridSearchResponse,
     HybridSearchResult,
@@ -64,21 +53,15 @@ from app.schemas.search import (
     SearchResponse,
     SearchResult,
 )
-<<<<<<< HEAD
 from LAYER2.layer2.app.services.embedding import embedding_service
 from LAYER2.layer2.app.services.neo4j_service import neo4j_service
 from LAYER2.layer2.app.services.recommender import recommend_responses
 from LAYER2.layer2.app.utils.safety_gateway import screen_untrusted_text
 from pydantic import BaseModel, Field
-=======
-from app.services.embedding import embedding_service
-from app.services.neo4j_service import neo4j_service
->>>>>>> main
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Search"])
 
-<<<<<<< HEAD
 class RecommendationRequest(BaseModel):
     concern_text: str = Field(..., description="Draft concern text to find similar cases for")
     top_k: int = Field(5, description="Number of recommendations to return")
@@ -100,8 +83,6 @@ class RecommendationResponse(BaseModel):
     results: list[RecommendationResult]
     query: str
 
-=======
->>>>>>> main
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -157,7 +138,6 @@ def _apply_filters(query, filters):
 async def search_rfis(
     body: SearchRequest, db: AsyncSession = Depends(get_db)
 ):
-<<<<<<< HEAD
     # ── 0. Safety Gateway (Bible §6.2) ────────────────────────────────────────
     screen = screen_untrusted_text(body.query)
     if screen["flagged"]:
@@ -165,19 +145,12 @@ async def search_rfis(
             results=[], total=0, query=body.query,
         )
 
-=======
->>>>>>> main
     # ── 1. Embed the query ───────────────────────────────────────────────────
     try:
         query_vec = await embedding_service.encode_async(body.query)
     except Exception as exc:
-<<<<<<< HEAD
         logger.error("Embedding failed for search query: %s", exc)
         raise HTTPException(status_code=503, detail="Embedding service unavailable.")
-=======
-        logger.error("Embedding failed for search query: %s. Using fallback vector.", exc)
-        query_vec = embedding_service._dummy_encode(body.query)
->>>>>>> main
 
     # ── 2. Build pgvector cosine similarity query ───────────────────────────
     # pgvector's <=> operator returns cosine distance (0=identical, 2=opposite).
@@ -309,7 +282,6 @@ async def hybrid_search(
     from pgvector.sqlalchemy import Vector
     from sqlalchemy import cast, literal
 
-<<<<<<< HEAD
     # ── Step 0: Safety Gateway (Bible §6.2) ─────────────────────────────────────
     screen = screen_untrusted_text(body.query)
     if screen["flagged"]:
@@ -318,21 +290,14 @@ async def hybrid_search(
             neo4j_enriched=False,
         )
 
-=======
->>>>>>> main
     # ── Step 1: embed the query ─────────────────────────────────────────────────
     try:
         query_vec = await embedding_service.encode_async(body.query)
     except Exception as exc:
-<<<<<<< HEAD
         logger.error("Embedding failed for hybrid search query: %s", exc)
         raise HTTPException(
             status_code=503, detail="Embedding service unavailable."
         )
-=======
-        logger.error("Embedding failed for hybrid search query: %s. Using fallback vector.", exc)
-        query_vec = embedding_service._dummy_encode(body.query)
->>>>>>> main
 
     # ── Step 2: pgvector ANN on consideration.embedding ───────────────────────
     # Returns (consideration_id_str, concern_text, score) per hit.
@@ -394,7 +359,6 @@ async def hybrid_search(
         query=body.query,
         neo4j_enriched=neo4j_enriched,
     )
-<<<<<<< HEAD
 
 
 # ─── Layer 5 Recommender ─────────────────────────────────────────────────────────
@@ -424,5 +388,3 @@ async def get_recommendations(
         raise HTTPException(status_code=500, detail="Recommendation service error")
     
     return RecommendationResponse(results=results, query=body.concern_text)
-=======
->>>>>>> main

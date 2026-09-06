@@ -8,23 +8,11 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 import httpx
-
-<<<<<<< HEAD
+import fitz  # PyMuPDF
 from ..safety_gateway import screen_untrusted_text
 from ..opa_client import check_governance
 from ..audit import write_audit_event
 from apps.backend.models import RFIExtractionTemplate
-=======
-try:
-    from apps.backend.models import RFIExtractionTemplate
-    from apps.backend.app.safety_gateway import screen_untrusted_text
-except ImportError:
-    from models import RFIExtractionTemplate
-    try:
-        from app.safety_gateway import screen_untrusted_text
-    except ImportError:
-        from safety_gateway import screen_untrusted_text
->>>>>>> main
 
 import anthropic
 from supabase import create_client, Client
@@ -36,6 +24,9 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+EXTRACTION_BACKEND = os.getenv("EXTRACTION_BACKEND", "gemini")
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5:1.5b")
 
 # Layer 2 Central Repository — pgvector + Postgres + audit trail
 # Defaults to localhost:8001 for local dev (Layer 1 uses 8000)
@@ -93,7 +84,7 @@ Field Guidelines:
 Return ONLY raw valid JSON, wrapped inside a JSON code block. No explanations or extra text.
 """
 
-    if GEMINI_API_KEY:
+    if EXTRACTION_BACKEND == "gemini" and GEMINI_API_KEY:
         try:
             base64_pdf = base64.b64encode(pdf_bytes).decode("utf-8")
             payload = {
@@ -131,7 +122,6 @@ Return ONLY raw valid JSON, wrapped inside a JSON code block. No explanations or
             for model_name in models_to_try:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
                 async with httpx.AsyncClient(timeout=60.0) as client:
-<<<<<<< HEAD
                     resp = await client.post(url, json=payload)
                     if resp.status_code == 200:
                         break
@@ -143,45 +133,11 @@ Return ONLY raw valid JSON, wrapped inside a JSON code block. No explanations or
 
             if resp is None or resp.status_code != 200:
                 if resp and resp.status_code == 400 and "API_KEY_INVALID" in resp.text:
-                    logger.warning("Gemini API key is invalid or revoked. Falling back to mock extraction mode for testing.")
+                    raise Exception("Gemini API key is invalid or revoked.")
                 elif resp:
                     raise Exception(f"Gemini API HTTP {resp.status_code}: {resp.text}")
                 else:
                     raise Exception("Failed to communicate with Gemini API.")
-=======
-                    try:
-                        resp = await client.post(url, json=payload)
-                        if resp.status_code == 200:
-                            break
-                        elif resp.status_code == 404:
-                            logger.warning("Model %s returned 404. Trying next model...", model_name)
-                            continue
-                        else:
-                            break
-                    except Exception as net_err:
-                        logger.warning("Network error calling Gemini model %s: %s", model_name, net_err)
-                        continue
-
-            if resp is None or resp.status_code != 200:
-                logger.warning("Gemini API call returned status %s. Falling back to structured extraction mode.", getattr(resp, 'status_code', None))
-                mock_extracted = {
-                    "rfi_id": f"CT-2026-PARSE-{int(datetime.now().timestamp()) % 10000:04d}",
-                    "due_date": "2026-04-15",
-                    "response_date": "2026-03-25",
-                    "submit_date": "2026-03-20",
-                    "msc": {"country": "Denmark"},
-                    "indication": {"name": "Immunology & IMPD Safety"},
-                    "considerations": [
-                        {
-                            "number": 1,
-                            "ctr_article": {"name": "Part I - Regulatory / Annex I, Section 63"},
-                            "response": {"text": f"Extracted from uploaded PDF document '{file.filename}' ({len(pdf_bytes)} bytes). IMPD Section 2.1 safety documentation and toxicological assay reporting updated."},
-                            "outcome": None
-                        }
-                    ]
-                }
-                return RFIExtractionTemplate.model_validate(mock_extracted)
->>>>>>> main
             else:
                 res_data = resp.json()
                 raw_text = res_data["candidates"][0]["content"]["parts"][0]["text"].strip()
@@ -199,7 +155,6 @@ Return ONLY raw valid JSON, wrapped inside a JSON code block. No explanations or
                 return validated_model
 
         except ValidationError as val_err:
-<<<<<<< HEAD
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"Gemini response failed Pydantic validation: {val_err}"
@@ -207,53 +162,12 @@ Return ONLY raw valid JSON, wrapped inside a JSON code block. No explanations or
         except HTTPException:
             raise
         except Exception as err:
-            if "API_KEY_INVALID" not in str(err):
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Error communicating with Gemini API: {str(err)}"
-                )
-            logger.warning("Gemini API error: %s. Falling back to mock extraction.", err)
-=======
-            logger.warning("Gemini response failed validation: %s. Falling back to structured extraction.", val_err)
-            mock_extracted = {
-                "rfi_id": f"CT-2026-PARSE-{int(datetime.now().timestamp()) % 10000:04d}",
-                "due_date": "2026-04-15",
-                "response_date": "2026-03-25",
-                "submit_date": "2026-03-20",
-                "msc": {"country": "Denmark"},
-                "indication": {"name": "Immunology & IMPD Safety"},
-                "considerations": [
-                    {
-                        "number": 1,
-                        "ctr_article": {"name": "Part I - Regulatory / Annex I, Section 63"},
-                        "response": {"text": f"Extracted from uploaded PDF document '{file.filename}'. IMPD Section 2.1 safety documentation updated."},
-                        "outcome": None
-                    }
-                ]
-            }
-            return RFIExtractionTemplate.model_validate(mock_extracted)
-        except Exception as err:
-            logger.warning("Gemini API exception: %s. Falling back to structured extraction.", err)
-            mock_extracted = {
-                "rfi_id": f"CT-2026-PARSE-{int(datetime.now().timestamp()) % 10000:04d}",
-                "due_date": "2026-04-15",
-                "response_date": "2026-03-25",
-                "submit_date": "2026-03-20",
-                "msc": {"country": "Denmark"},
-                "indication": {"name": "Immunology & IMPD Safety"},
-                "considerations": [
-                    {
-                        "number": 1,
-                        "ctr_article": {"name": "Part I - Regulatory / Annex I, Section 63"},
-                        "response": {"text": f"Extracted from uploaded PDF document '{file.filename}'. IMPD Section 2.1 safety documentation updated."},
-                        "outcome": None
-                    }
-                ]
-            }
-            return RFIExtractionTemplate.model_validate(mock_extracted)
->>>>>>> main
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error communicating with Gemini API: {str(err)}"
+            )
 
-    elif ANTHROPIC_API_KEY:
+    elif EXTRACTION_BACKEND == "anthropic" and ANTHROPIC_API_KEY:
         try:
             client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
             base64_pdf = base64.b64encode(pdf_bytes).decode("utf-8")
@@ -313,25 +227,61 @@ Return ONLY raw valid JSON, wrapped inside a JSON code block. No explanations or
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Error communicating with Anthropic Claude API: {str(err)}"
             )
+    elif EXTRACTION_BACKEND == "ollama":
+        try:
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            pdf_text = ""
+            for page in doc:
+                pdf_text += page.get_text()
+            
+            ollama_prompt = f"{prompt}\n\nPDF TEXT:\n{pdf_text}"
+            
+            payload = {
+                "model": OLLAMA_MODEL,
+                "prompt": ollama_prompt,
+                "format": "json",
+                "stream": False
+            }
+            
+            url = f"{OLLAMA_HOST}/api/generate"
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                resp = await client.post(url, json=payload)
+                
+            if resp.status_code != 200:
+                raise Exception(f"Ollama API HTTP {resp.status_code}: {resp.text}")
+                
+            res_data = resp.json()
+            raw_text = res_data.get("response", "").strip()
+            
+            # Clean markdown codeblocks if present
+            if raw_text.startswith("```json"):
+                raw_text = raw_text[7:]
+            if raw_text.startswith("```"):
+                raw_text = raw_text[3:]
+            if raw_text.endswith("```"):
+                raw_text = raw_text[:-3]
+            raw_text = raw_text.strip()
+            
+            extracted_json = json.loads(raw_text)
+            validated_model = RFIExtractionTemplate.model_validate(extracted_json)
+            return validated_model
+            
+        except ValidationError as val_err:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Ollama response failed Pydantic validation: {val_err}"
+            )
+        except Exception as err:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error communicating with Ollama API: {str(err)}"
+            )
+
     else:
-        # Fallback demonstration mode when API key is not configured
-        mock_extracted = {
-            "rfi_id": "CT-2024-123456-12-00-SM01-001",
-            "due_date": "2026-03-16",
-            "response_date": "2026-03-06",
-            "submit_date": "2026-03-05",
-            "msc": {"country": "Germany"},
-            "indication": {"name": "Type 2 Diabetes Mellitus"},
-            "considerations": [
-                {
-                    "number": 1,
-                    "ctr_article": {"name": "Part I - Regulatory / Annex I, Section 63"},
-                    "response": {"text": f"Extracted from uploaded PDF: '{file.filename}' (bytes: {len(pdf_bytes)}). Proof of payment provided."},
-                    "outcome": None
-                }
-            ]
-        }
-        return RFIExtractionTemplate.model_validate(mock_extracted)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No valid extraction backend configured (check EXTRACTION_BACKEND in .env)."
+        )
 
 
 @router.post("/ingest")
@@ -354,11 +304,7 @@ async def ingest_rfi(payload: RFIExtractionTemplate):
     # Append Immutable Metadata
     metadata = {
         "ingested_at": datetime.now(timezone.utc).isoformat(),
-<<<<<<< HEAD
         "owner_team": "EU-Hub-Regulatory", # Updated to match OPA policy logic
-=======
-        "owner_team": "EU-CTR-Data-Mesh-Team",
->>>>>>> main
         "validation_status": "VALIDATED"
     }
 
@@ -367,7 +313,6 @@ async def ingest_rfi(payload: RFIExtractionTemplate):
         **metadata
     }
 
-<<<<<<< HEAD
     # Governance Check (OPA)
     gov_violations = check_governance(
         request={"action": "write", "user_team": metadata["owner_team"]},
@@ -408,32 +353,10 @@ async def ingest_rfi(payload: RFIExtractionTemplate):
     db_status = "persisted"
     db_message = "Record written to Supabase Postgres table 'rfi_intake'."
 
-=======
-    # Write to Supabase Postgres
-    supabase = get_supabase_client()
-    db_status = "persisted"
-    db_message = "Record written to Supabase Postgres table 'rfi_intake'."
-
-    if supabase:
-        try:
-            supabase.table("rfi_intake").insert(record_to_insert).execute()
-        except Exception as db_err:
-            db_status = "db_write_error"
-            db_message = f"Supabase insert error: {str(db_err)}"
-    else:
-        db_status = "persisted_mock"
-        db_message = "Supabase environment variables not configured. Record validated and prepared for Postgres write."
-
->>>>>>> main
     # ── Forward to Layer 2 Central Repository ──────────────────────────────
     # Layer 2 stores the record in pgvector with per-consideration embeddings,
     # creates a tamper-evident audit chain, and makes the record searchable
     # via POST /search and POST /search/hybrid.
-<<<<<<< HEAD
-=======
-    layer2_status = "not_forwarded"
-    layer2_message = ""
->>>>>>> main
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             l2_response = await client.post(
@@ -447,7 +370,6 @@ async def ingest_rfi(payload: RFIExtractionTemplate):
                 layer2_status = "duplicate"
                 layer2_message = "Record already exists in Layer 2 (duplicate rfi_id)."
             else:
-<<<<<<< HEAD
                 logger.error("Layer 2 returned HTTP %s: %s", l2_response.status_code, l2_response.text[:200])
                 raise HTTPException(
                     status_code=status.HTTP_502_BAD_GATEWAY,
@@ -467,18 +389,6 @@ async def ingest_rfi(payload: RFIExtractionTemplate):
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Layer 2 forwarding error: {str(l2_err)}"
         )
-=======
-                layer2_status = "forward_error"
-                layer2_message = f"Layer 2 returned HTTP {l2_response.status_code}: {l2_response.text[:200]}"
-    except httpx.ConnectError:
-        layer2_status = "layer2_offline"
-        layer2_message = f"Layer 2 not reachable at {LAYER2_URL}. Record validated but not forwarded."
-        logger.warning("Layer 2 not reachable at %s — record not forwarded.", LAYER2_URL)
-    except Exception as l2_err:
-        layer2_status = "forward_error"
-        layer2_message = f"Layer 2 forwarding error: {str(l2_err)}"
-        logger.error("Layer 2 forwarding failed: %s", l2_err)
->>>>>>> main
 
     return {
         "status": "success",
@@ -486,10 +396,6 @@ async def ingest_rfi(payload: RFIExtractionTemplate):
         "message": db_message,
         "layer2_status": layer2_status,
         "layer2_message": layer2_message,
-<<<<<<< HEAD
         "record": record_to_insert,
         "audit_event": audit_event
-=======
-        "record": record_to_insert
->>>>>>> main
     }

@@ -23,7 +23,6 @@ echo "📦 Checking npm dependencies..."
 npm install --quiet
 npm install --prefix apps/frontend --quiet
 
-<<<<<<< HEAD
 # 4. Initialize Database Schema
 echo "🗄️ Initializing Database schema..."
 if [ -f "LAYER2/layer2/.env" ]; then
@@ -33,8 +32,15 @@ else
     echo "⚠️ LAYER2/layer2/.env not found, skipping database migrations."
 fi
 
-=======
->>>>>>> main
+# 5. Pull Ollama Model
+echo "🦙 Checking Ollama for local LLM extraction..."
+if command -v ollama &> /dev/null; then
+    echo "📥 Pulling local qwen2.5:1.5b model..."
+    ollama pull qwen2.5:1.5b
+else
+    echo "⚠️ Ollama is not installed! You will need to install Ollama from https://ollama.com to use the local PDF parser."
+fi
+
 echo "======================================================="
 echo " 🎉 Setup Complete! You can now run:"
 echo "   - npm run dev           (starts Layer 2, Backend, & Frontend)"
