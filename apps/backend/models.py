@@ -1,6 +1,6 @@
 from datetime import date
-from typing import Optional, List
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from typing import Optional, List, Any
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 
 
 def _validate_non_empty_string(value: str, field_name: str) -> str:
@@ -120,21 +120,31 @@ class RFIExtractionTemplate(BaseModel):
         }
     }
 
+    @model_validator(mode='before')
+    @classmethod
+    def handle_string_objects(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if isinstance(data.get('msc'), str):
+                data['msc'] = {'country': data['msc']}
+            if isinstance(data.get('indication'), str):
+                data['indication'] = {'name': data['indication']}
+        return data
+
     rfi_id: str = Field(
         ...,
         description="Unique RFI identifier as printed in the document. Maps to RFI.rfi_id merge key.",
         min_length=1
     )
     due_date: Optional[date] = Field(
-        ...,
+        default=None,
         description="Maps to RFI.due_date. Strict format: YYYY-MM-DD."
     )
     response_date: Optional[date] = Field(
-        ...,
+        default=None,
         description="Maps to RFI.response_date. Strict format: YYYY-MM-DD."
     )
     submit_date: Optional[date] = Field(
-        ...,
+        default=None,
         description="Maps to RFI.submit_date. Strict format: YYYY-MM-DD."
     )
     msc: MSC = Field(
