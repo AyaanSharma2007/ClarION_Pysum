@@ -162,8 +162,9 @@ Field Guidelines:
 - indication.name: Full standard name of therapeutic indication (e.g. 'Type 2 Diabetes Mellitus').
 - considerations: List of individual consideration objects (min 1 item required).
   - number: Integer consideration number.
+  - concern_text: CRITICAL — extract the NCA authority's question, concern, or objection text verbatim. This is the question ASKED BY the authority (e.g. 'Please provide evidence that...', 'Clarify the protocol section...'). If labelled as 'Concern', 'Question', 'RFI text', or 'Authority comment', extract it here. Do NOT leave this null if any concern/question text exists.
   - ctr_article.name: Referenced section/article/annex (e.g. 'Annex I, Section 63').
-  - response.text: Sponsor response text extracted verbatim.
+  - response.text: The sponsor's response text extracted verbatim from the 'Sponsor response' field.
   - outcome: Optional object with status string or null.
 
 Return ONLY raw valid JSON, wrapped inside a JSON code block. No explanations or extra text.

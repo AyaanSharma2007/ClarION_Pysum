@@ -22,6 +22,18 @@ styleEl.textContent = `
 `;
 document.head.appendChild(styleEl);
 
+function useTheme() {
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem('clarion-theme') || 'light'; } catch { return 'light'; }
+  });
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    try { localStorage.setItem('clarion-theme', theme); } catch {}
+  }, [theme]);
+  const toggle = () => setTheme(t => t === 'light' ? 'dark' : 'light');
+  return [theme, toggle];
+}
+
 const SORT_FNS = {
   sla_asc: (a, b) => {
     const ad = new Date(a.workflow_state?.sla_due_at || 0).getTime();
@@ -148,6 +160,7 @@ const s = {
 };
 
 export default function App() {
+  const [theme, toggleTheme] = useTheme();
   const [rfis, setRfis] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -243,6 +256,15 @@ export default function App() {
             <span style={s.logoSub}>EU CTR Regulatory Intelligence</span>
           </div>
         </div>
+
+        <button
+          id="theme-toggle-btn"
+          style={s.refreshBtn}
+          onClick={toggleTheme}
+          title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+        >
+          {theme === 'light' ? '🌙 Dark' : '☀️ Light'}
+        </button>
 
         <button
           id="refresh-btn"

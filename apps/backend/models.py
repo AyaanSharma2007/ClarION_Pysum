@@ -74,6 +74,10 @@ class Consideration(BaseModel):
         ...,
         description="Maps to Consideration.number. Taken directly from document 'Consideration number' field."
     )
+    concern_text: Optional[str] = Field(
+        default=None,
+        description="The NCA's question or concern text — the actual RFI question raised by the authority. Maps to Consideration.concern_text."
+    )
     ctr_article: CTRArticle = Field(
         ...,
         description="Maps to (Consideration)-[:REFERENCES]->(CTRArticle)."

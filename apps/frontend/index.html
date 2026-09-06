@@ -10,6 +10,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300;0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
       *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      /* ── Light theme (default) ──────────────────────────────────────── */
       :root {
         --bg: #f4f6fb;
         --bg-card: #ffffff;
@@ -32,20 +34,55 @@
         --red-light: #ffebee;
         --shadow-sm: 0 1px 4px rgba(79,114,255,0.06), 0 1px 2px rgba(0,0,0,0.04);
         --shadow-md: 0 4px 16px rgba(79,114,255,0.10), 0 2px 6px rgba(0,0,0,0.06);
-        --radius-sm: 8px;
-        --radius-md: 14px;
-        --radius-lg: 20px;
+        --radius-sm: 10px;
+        --radius-md: 16px;
+        --radius-lg: 24px;
       }
-      html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; font-size: 13px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+
+      /* ── Dark theme ─────────────────────────────────────────────────── */
+      [data-theme="dark"] {
+        --bg: #0e0f1a;
+        --bg-card: #161828;
+        --bg-hover: #1e2038;
+        --bg-sidebar: #12142a;
+        --border: #252840;
+        --border-hover: #383b60;
+        --text: #e8eaf6;
+        --text-muted: #9094c0;
+        --text-dim: #565a80;
+        --accent-blue: #7c9cff;
+        --accent-blue-light: #1a2052;
+        --accent-pink: #f48fb1;
+        --accent-pink-light: #2d1a26;
+        --green: #4cde98;
+        --green-light: #0e2e20;
+        --amber: #ffcc02;
+        --amber-light: #2a2000;
+        --red: #ff7474;
+        --red-light: #2d0e0e;
+        --shadow-sm: 0 1px 4px rgba(0,0,0,0.3);
+        --shadow-md: 0 4px 20px rgba(0,0,0,0.45);
+        --radius-sm: 10px;
+        --radius-md: 16px;
+        --radius-lg: 24px;
+      }
+
+      html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased; transition: background 0.2s, color 0.2s; }
       #root { min-height: 100vh; display: flex; flex-direction: column; }
-      * { scrollbar-width: thin; scrollbar-color: #c8d3f0 transparent; }
+      * { scrollbar-width: thin; scrollbar-color: var(--border-hover) transparent; }
       ::-webkit-scrollbar { width: 5px; height: 5px; }
-      ::-webkit-scrollbar-thumb { background: #c8d3f0; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 4px; }
       button, input, textarea, select { font-family: inherit; font-size: inherit; }
       a { color: inherit; text-decoration: none; }
       code, .mono { font-family: 'JetBrains Mono', monospace; }
     </style>
-
+    <script>
+      /* Apply saved theme before first paint to avoid flash */
+      try {
+        const t = localStorage.getItem('clarion-theme');
+        if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+      } catch(e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
