@@ -1,348 +1,312 @@
-import React, { useState, useEffect } from 'react';
-import Header from './components/Header';
-import RaClinicalView from './components/RaClinicalView';
-import CtaOpsView from './components/CtaOpsView';
-import MedicalWritingView from './components/MedicalWritingView';
-import RiskPredictorView from './components/RiskPredictorView';
-import ExecutiveView from './components/ExecutiveView';
-import GuidedDemoModal from './components/GuidedDemoModal';
-import { checkSystemHealth } from './services/api';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import FilterBar from './components/FilterBar';
+import RfiList from './components/RfiList';
+import DetailPanel from './components/DetailPanel';
+import { fetchAllRfis, parsePdfLayer1, ingestRfiLayer1 } from './services/api';
 
-const RFIS = [
-  {
-    rfi_uuid: 'CT-2026-QWEN-TEST-001',
-    rfi_id: 'CT-2026-QWEN-TEST-001',
-    msc_country: 'Denmark',
-    indication_name: 'Immunology',
-    category: 'IMPD Safety',
-    stage: 'RA_Clinical_Review',
-    sla_status: 'ACTIVE',
-    due_date: new Date(Date.now() + 48 * 3600 * 1000).toISOString(),
-    considerations: [{
-      ctr_article: { name: 'Annex I, Section 63' },
-      response: { text: 'IMPD Section 2.1 safety documentation and toxicological assay reporting updated.' },
-    }],
+// ── CSS animation for slide-in panel
+const styleEl = document.createElement('style');
+styleEl.textContent = `
+  @keyframes slideInRight {
+    from { transform: translateX(40px); opacity: 0; }
+    to   { transform: translateX(0);    opacity: 1; }
+  }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+`;
+document.head.appendChild(styleEl);
+
+const SORT_FNS = {
+  sla_asc: (a, b) => {
+    const ad = new Date(a.workflow_state?.sla_due_at || 0).getTime();
+    const bd = new Date(b.workflow_state?.sla_due_at || 0).getTime();
+    return ad - bd;
   },
-  {
-    rfi_uuid: 'CT-2024-884920-14-DE-001',
-    rfi_id: 'CT-2024-884920-14-DE-001',
-    msc_country: 'Germany',
-    indication_name: 'Type 2 Diabetes',
-    category: 'Statistics',
-    stage: 'Received',
-    sla_status: 'ACTIVE',
-    due_date: new Date(Date.now() + 30 * 3600 * 1000).toISOString(),
-    considerations: [{
-      ctr_article: { name: 'Part I – Regulatory / Annex I, Section 63' },
-      response: { text: 'Statistical power calculation and sample size justification section 4.2 updated.' },
-    }],
+  received_desc: (a, b) => new Date(b.received_at || 0) - new Date(a.received_at || 0),
+  country_asc: (a, b) => (a.nca_country || '').localeCompare(b.nca_country || ''),
+  risk_desc: (a, b) => (b._riskScore || 0) - (a._riskScore || 0),
+};
+
+const s = {
+  root: {
+    minHeight: '100vh',
+    background: 'var(--bg)',
+    display: 'flex',
+    flexDirection: 'column',
   },
-  {
-    rfi_uuid: 'CT-2024-991204-09-FR-002',
-    rfi_id: 'CT-2024-991204-09-FR-002',
-    msc_country: 'France',
-    indication_name: 'Oncology',
-    category: 'Protocol Design',
-    stage: 'CTA_Mgmt_Review',
-    sla_status: 'ACTIVE',
-    due_date: new Date(Date.now() + 12 * 3600 * 1000).toISOString(),
-    considerations: [{
-      ctr_article: { name: 'Annex I, Section 12 – IMP Quality' },
-      response: { text: 'Batch release specification and dosage regimen details updated.' },
-    }],
+  topBar: {
+    borderBottom: '1px solid var(--border)',
+    padding: '0 28px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 16,
+    height: 56,
+    flexShrink: 0,
+    position: 'sticky',
+    top: 0,
+    background: '#080808',
+    zIndex: 50,
   },
-];
+  logo: {
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: 15,
+    fontWeight: 700,
+    color: '#fff',
+    letterSpacing: '-0.02em',
+    flexShrink: 0,
+  },
+  logoSub: {
+    fontSize: 10,
+    fontWeight: 400,
+    color: 'var(--text-dim)',
+    display: 'block',
+    letterSpacing: 0,
+  },
+  uploadBtn: (uploading) => ({
+    marginLeft: 'auto',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 7,
+    padding: '8px 16px',
+    background: uploading ? '#1a1a1a' : '#fff',
+    color: uploading ? '#888' : '#000',
+    border: 'none',
+    borderRadius: 8,
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: uploading ? 'not-allowed' : 'pointer',
+    transition: 'all 0.15s',
+    flexShrink: 0,
+  }),
+  refreshBtn: {
+    background: 'transparent',
+    border: '1px solid var(--border)',
+    borderRadius: 7,
+    color: 'var(--text-muted)',
+    cursor: 'pointer',
+    padding: '6px 11px',
+    fontSize: 12,
+    transition: 'border-color 0.15s',
+    flexShrink: 0,
+  },
+  main: {
+    flex: 1,
+    maxWidth: 900,
+    width: '100%',
+    margin: '0 auto',
+    padding: '0 28px 40px',
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: 0,
+  },
+  errorBanner: {
+    margin: '16px 0',
+    padding: '12px 16px',
+    background: 'rgba(239,68,68,0.07)',
+    border: '1px solid rgba(239,68,68,0.2)',
+    borderRadius: 8,
+    color: '#fca5a5',
+    fontSize: 12,
+  },
+  loadingRow: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: '80px 0',
+    gap: 10,
+    color: 'var(--text-dim)',
+    fontSize: 13,
+  },
+};
 
-// ── Pipeline step indicator ────────────────────────────────────────────────────
-const STEPS = ['Upload PDF', 'Review Extraction', 'Forward to Layer 2']
-
-function StepIndicator({ current }) {
-  return (
-    <div className="flex items-center justify-center gap-0 mb-10">
-      {STEPS.map((label, i) => {
-        const done = i < current
-        const active = i === current
-        return (
-          <React.Fragment key={i}>
-            <div className="flex flex-col items-center gap-1.5">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
-                  done
-                    ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30'
-                    : active
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30 ring-4 ring-blue-600/20'
-                    : 'bg-slate-800 text-slate-500 border border-slate-700'
-                }`}
-              >
-                {done ? <CheckCircle2 className="w-4 h-4" /> : i + 1}
-              </div>
-              <span
-                className={`text-[10px] font-medium whitespace-nowrap ${
-                  active ? 'text-blue-400' : done ? 'text-emerald-400' : 'text-slate-500'
-                }`}
-              >
-                {label}
-              </span>
-            </div>
-            {i < STEPS.length - 1 && (
-              <div
-                className={`w-20 h-px mb-5 mx-1 transition-all duration-500 ${
-                  i < current ? 'bg-emerald-500' : 'bg-slate-700'
-                }`}
-              />
-            )}
-          </React.Fragment>
-        )
-      })}
-    </div>
-  )
-}
-
-// ── Drop zone ─────────────────────────────────────────────────────────────────
-function DropZone({ onFile, loading }) {
-  const inputRef = useRef(null)
-  const [dragging, setDragging] = useState(false)
-
-  const handleDrop = useCallback(
-    (e) => {
-      e.preventDefault()
-      setDragging(false)
-      const file = e.dataTransfer.files?.[0]
-      if (file) onFile(file)
-    },
-    [onFile]
-  )
-
-  return (
-    <div
-      onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={handleDrop}
-      onClick={() => !loading && inputRef.current?.click()}
-      className={`relative group flex flex-col items-center justify-center gap-5 rounded-2xl border-2 border-dashed transition-all duration-300 cursor-pointer select-none
-        ${dragging
-          ? 'border-blue-500 bg-blue-500/10 scale-[1.01]'
-          : 'border-slate-700 bg-slate-900/40 hover:border-blue-500/60 hover:bg-blue-500/5'
-        }
-        ${loading ? 'pointer-events-none opacity-60' : ''}
-        p-14`}
-    >
-      {/* Glow */}
-      <div className={`absolute inset-0 rounded-2xl transition-opacity duration-300 ${dragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-        style={{ background: 'radial-gradient(ellipse at 50% 0%, rgba(59,130,246,0.08) 0%, transparent 70%)' }}
-      />
-
-      <div className={`p-5 rounded-2xl transition-all duration-300 ${dragging ? 'bg-blue-500/20 scale-110' : 'bg-slate-800 group-hover:bg-slate-700'}`}>
-        {loading
-          ? <Loader2 className="w-10 h-10 text-blue-400 animate-spin" />
-          : <Upload className="w-10 h-10 text-slate-400 group-hover:text-blue-400 transition-colors" />
-        }
-      </div>
-
-      <div className="text-center space-y-1.5">
-        <p className="text-base font-semibold text-slate-200">
-          {loading ? 'Extracting with Claude…' : 'Drop your RFI PDF here'}
-        </p>
-        <p className="text-sm text-slate-500">
-          {loading ? 'Parsing document structure and entities' : 'or click to browse — PDF only'}
-        </p>
-      </div>
-
-      {!loading && (
-        <div className="flex items-center gap-4 text-xs text-slate-600">
-          <span className="flex items-center gap-1.5"><Shield className="w-3 h-3" /> EU CTR validated</span>
-          <span className="w-px h-3 bg-slate-700" />
-          <span className="flex items-center gap-1.5"><Zap className="w-3 h-3" /> Claude-powered extraction</span>
-        </div>
-      )}
-
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".pdf,application/pdf"
-        className="hidden"
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f) }}
-      />
-    </div>
-  )
-}
-
-// ── Consideration card (collapsible) ──────────────────────────────────────────
-function ConsiderationCard({ c, index }) {
-  const [open, setOpen] = useState(index === 0)
-  return (
-    <div className="rounded-xl border border-slate-800 overflow-hidden">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-slate-900/60 hover:bg-slate-800/60 transition text-left"
-      >
-        <div className="flex items-center gap-3">
-          <span className="w-6 h-6 rounded-full bg-blue-600/20 text-blue-400 text-xs font-bold flex items-center justify-center border border-blue-500/30">
-            {c.number}
-          </span>
-          <span className="text-sm font-medium text-slate-300 truncate max-w-xs">
-            {c.ctr_article?.name || 'CTR Article'}
-          </span>
-        </div>
-        {open ? <ChevronUp className="w-4 h-4 text-slate-500 flex-shrink-0" /> : <ChevronDown className="w-4 h-4 text-slate-500 flex-shrink-0" />}
-      </button>
-      {open && (
-        <div className="px-4 py-4 space-y-3 bg-slate-950/40 border-t border-slate-800">
-          {c.concern_text && (
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Concern</p>
-              <p className="text-xs text-slate-300 leading-relaxed">{c.concern_text}</p>
-            </div>
-          )}
-          {c.response?.text && (
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Sponsor Response</p>
-              <p className="text-xs text-slate-300 leading-relaxed">{c.response.text}</p>
-            </div>
-          )}
-          {c.outcome?.status && (
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Outcome</p>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                {c.outcome.status}
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Review panel ──────────────────────────────────────────────────────────────
-function ReviewPanel({ extracted, filename, onConfirm, onReset, forwarding, forwardResult }) {
-  const meta = [
-    { label: 'RFI ID', value: extracted.rfi_id },
-    { label: 'Member State', value: extracted.msc?.country },
-    { label: 'Indication', value: extracted.indication?.name },
-    { label: 'Due Date', value: extracted.due_date },
-    { label: 'Response Date', value: extracted.response_date },
-    { label: 'Submit Date', value: extracted.submit_date },
-  ]
-
-  return (
-    <div className="space-y-6">
-      {/* Source file badge */}
-      <div className="flex items-center gap-3 px-4 py-3 bg-slate-900/50 border border-slate-800 rounded-xl">
-        <FileText className="w-4 h-4 text-blue-400 flex-shrink-0" />
-        <span className="text-sm text-slate-300 font-medium truncate">{filename}</span>
-        <span className="ml-auto text-xs text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 flex-shrink-0">
-          Extracted
-        </span>
-      </div>
-
-      {/* Metadata grid */}
-      <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">RFI Metadata</h3>
-        <div className="grid grid-cols-2 gap-2">
-          {meta.map(({ label, value }) => (
-            <div key={label} className="bg-slate-900/60 border border-slate-800 rounded-xl px-4 py-3">
-              <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-0.5">{label}</p>
-              <p className="text-sm font-medium text-slate-100 truncate">{value || '—'}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Considerations */}
-      <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">
-          Considerations ({extracted.considerations?.length ?? 0})
-        </h3>
-        <div className="space-y-2">
-          {(extracted.considerations ?? []).map((c, i) => (
-            <ConsiderationCard key={i} c={c} index={i} />
-          ))}
-        </div>
-      </div>
-
-      {/* Actions / Result */}
-      {forwardResult ? (
-        <div className={`rounded-xl p-4 border ${
-          forwardResult.ok
-            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
-            : 'bg-rose-500/10 border-rose-500/20 text-rose-300'
-        }`}>
-          <div className="flex items-center gap-2 font-medium text-sm mb-1">
-            {forwardResult.ok
-              ? <CheckCircle2 className="w-4 h-4" />
-              : <AlertCircle className="w-4 h-4" />}
-            {forwardResult.ok ? 'Successfully forwarded to Layer 2' : 'Forwarding failed'}
-          </div>
-          <p className="text-xs opacity-80">{forwardResult.message}</p>
-          {forwardResult.ok && forwardResult.layer2Status && (
-            <p className="text-xs mt-1 opacity-70">Layer 2: {forwardResult.layer2Status}</p>
-          )}
-          <button
-            onClick={onReset}
-            className="mt-3 flex items-center gap-2 text-xs font-medium opacity-70 hover:opacity-100 transition"
-          >
-            <RotateCcw className="w-3 h-3" /> Upload another PDF
-          </button>
-        </div>
-      ) : (
-        <div className="flex items-center gap-3 pt-2">
-          <button
-            onClick={onReset}
-            className="flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200 transition px-4 py-2.5 rounded-xl border border-slate-800 hover:border-slate-600"
-          >
-            <RotateCcw className="w-4 h-4" />
-            Re-upload
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={forwarding}
-            className="flex-1 flex items-center justify-center gap-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white px-5 py-2.5 rounded-xl font-semibold text-sm transition shadow-lg shadow-blue-600/20 cursor-pointer"
-          >
-            {forwarding
-              ? <><Loader2 className="w-4 h-4 animate-spin" /><span>Forwarding to Layer 2…</span></>
-              : <><Send className="w-4 h-4" /><span>Forward to Layer 2</span><ArrowRight className="w-4 h-4" /></>
-            }
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
-
-
-// ── Main app ──────────────────────────────────────────────────────────────────
 export default function App() {
-  const [role, setRole] = useState('ra_clinical');
-  const [health, setHealth] = useState({ layer1: false, layer2: false, ollama: false });
-  const [showDemo, setShowDemo] = useState(false);
+  const [rfis, setRfis] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedRfi, setSelectedRfi] = useState(null);
+  const [pendingUploads, setPendingUploads] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    const poll = async () => setHealth(await checkSystemHealth());
-    poll();
-    const t = setInterval(poll, 10000);
-    return () => clearInterval(t);
+  const [filters, setFilters] = useState({
+    query: '',
+    country: 'all',
+    stage: 'all',
+    category: 'all',
+    sort: 'sla_asc',
+  });
+
+  // ── Fetch all RFIs ─────────────────────────────────────────────────────────
+  const loadRfis = useCallback(async () => {
+    try {
+      const data = await fetchAllRfis();
+      setRfis(Array.isArray(data) ? data : []);
+      setError(null);
+    } catch (e) {
+      setError('Could not reach Layer 2 (localhost:8001). Make sure the server is running.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0a', display: 'flex', flexDirection: 'column' }}>
-      <Header
-        activeRole={role}
-        setActiveRole={setRole}
-        systemHealth={health}
-        onOpenDemo={() => setShowDemo(true)}
-      />
+  useEffect(() => {
+    loadRfis();
+    const t = setInterval(loadRfis, 30000);
+    return () => clearInterval(t);
+  }, [loadRfis]);
 
-      <main style={{ flex: 1, maxWidth: 1280, width: '100%', margin: '0 auto', padding: '0 24px' }}>
-        {role === 'ra_clinical'     && <RaClinicalView rfis={RFIS} onRefresh={() => {}} />}
-        {role === 'cta_ops'         && <CtaOpsView onRefresh={() => {}} />}
-        {role === 'risk_engine'     && <RiskPredictorView />}
-        {role === 'medical_writing' && <MedicalWritingView />}
-        {role === 'executive'       && <ExecutiveView rfis={RFIS} />}
+  // ── Upload handler ─────────────────────────────────────────────────────────
+  const handleFileSelected = useCallback(async (file) => {
+    if (!file || uploading) return;
+    if (!file.name.endsWith('.pdf') && file.type !== 'application/pdf') return;
+
+    const pendingId = `pending-${Date.now()}`;
+    const pendingEntry = { id: pendingId, filename: file.name };
+
+    // 1. Optimistically show a faded placeholder row immediately
+    setPendingUploads(prev => [...prev, pendingEntry]);
+    setUploading(true);
+
+    try {
+      // 2. Parse PDF (runs against Layer 1 Ollama pipeline)
+      const parsed = await parsePdfLayer1(file);
+
+      // 3. Ingest into Layer 2
+      await ingestRfiLayer1(parsed);
+
+      // 4. Remove placeholder, refresh list to show real record
+      setPendingUploads(prev => prev.filter(p => p.id !== pendingId));
+      await loadRfis();
+    } catch (e) {
+      // Remove placeholder on failure (silently for non-IT users)
+      setPendingUploads(prev => prev.filter(p => p.id !== pendingId));
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }, [uploading, loadRfis]);
+
+  // ── Distinct countries for filter dropdown ─────────────────────────────────
+  const countries = useMemo(
+    () => [...new Set(rfis.map(r => r.nca_country).filter(Boolean))].sort(),
+    [rfis]
+  );
+
+  // ── Filtered + sorted list ─────────────────────────────────────────────────
+  const displayRfis = useMemo(() => {
+    let list = [...rfis];
+
+    if (filters.query.trim()) {
+      const q = filters.query.toLowerCase();
+      list = list.filter(r =>
+        r.rfi_id?.toLowerCase().includes(q) ||
+        r.nca_country?.toLowerCase().includes(q) ||
+        r.therapeutic_area_name?.toLowerCase().includes(q) ||
+        r.category?.toLowerCase().includes(q) ||
+        r.considerations?.some(c =>
+          c.concern_text?.toLowerCase().includes(q) ||
+          c.response_text?.toLowerCase().includes(q)
+        )
+      );
+    }
+
+    if (filters.country !== 'all') {
+      list = list.filter(r => r.nca_country === filters.country);
+    }
+
+    if (filters.stage !== 'all') {
+      list = list.filter(r =>
+        (r.workflow_state?.current_stage || r.status) === filters.stage
+      );
+    }
+
+    if (filters.category !== 'all') {
+      list = list.filter(r => r.category === filters.category);
+    }
+
+    const sortFn = SORT_FNS[filters.sort] || SORT_FNS.sla_asc;
+    list.sort(sortFn);
+
+    return list;
+  }, [rfis, filters]);
+
+  return (
+    <div style={s.root}>
+      {/* ── Top Bar ── */}
+      <header style={s.topBar}>
+        <div style={s.logo}>
+          ClarION
+          <span style={s.logoSub}>EU CTR Regulatory Intelligence</span>
+        </div>
+
+        <button
+          id="refresh-btn"
+          style={s.refreshBtn}
+          onClick={loadRfis}
+          title="Refresh list"
+          onMouseEnter={e => (e.target.style.borderColor = '#555')}
+          onMouseLeave={e => (e.target.style.borderColor = 'var(--border)')}
+        >
+          ↻ Refresh
+        </button>
+
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,application/pdf"
+          style={{ display: 'none' }}
+          id="pdf-upload-input"
+          onChange={e => handleFileSelected(e.target.files?.[0])}
+        />
+
+        <button
+          id="upload-rfi-btn"
+          style={s.uploadBtn(uploading)}
+          disabled={uploading}
+          onClick={() => !uploading && fileInputRef.current?.click()}
+        >
+          {uploading ? '⏳ Processing…' : '↑ Upload RFI'}
+        </button>
+      </header>
+
+      {/* ── Main Content ── */}
+      <main style={s.main}>
+        {error && <div style={s.errorBanner}>⚠ {error}</div>}
+
+        {/* Filter Bar */}
+        <FilterBar
+          filters={filters}
+          setFilters={setFilters}
+          countries={countries}
+          resultCount={displayRfis.length}
+        />
+
+        {/* RFI List */}
+        {loading ? (
+          <div style={s.loadingRow}>
+            <span style={{ fontSize: 20, animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</span>
+            Loading RFIs from database…
+          </div>
+        ) : (
+          <RfiList
+            rfis={displayRfis}
+            pendingUploads={pendingUploads}
+            selectedId={selectedRfi?.id}
+            onSelect={setSelectedRfi}
+          />
+        )}
       </main>
 
-      {showDemo && (
-        <GuidedDemoModal onClose={() => setShowDemo(false)} setActiveRole={setRole} />
+      {/* ── Detail Panel (slide-in) ── */}
+      {selectedRfi && (
+        <DetailPanel
+          rfi={selectedRfi}
+          onClose={() => setSelectedRfi(null)}
+          onStageAdvanced={loadRfis}
+        />
       )}
     </div>
   );

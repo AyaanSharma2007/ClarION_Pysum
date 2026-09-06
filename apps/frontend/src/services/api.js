@@ -97,6 +97,15 @@ export const searchHybrid = async (queryText, topK = 5, ownerTeam = 'EU-Hub-Regu
   }
 };
 
+export const fetchAllRfis = async () => {
+  try {
+    const res = await axios.get(`${LAYER2_URL}/rfi`);
+    return res.data;
+  } catch (err) {
+    throw err.response?.data || err;
+  }
+};
+
 export const getRfiByUuid = async (identifier) => {
   try {
     const res = await axios.get(`${LAYER2_URL}/rfi/${identifier}`);
