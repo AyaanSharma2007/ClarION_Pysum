@@ -355,7 +355,7 @@ async def draft_response(consideration_id: str, force: bool = False):
         "indication": consideration_data.get("indication", ""),
     }
 
-    # Step 2: Fetch previous drafts — return the latest if it already exists (cache hit)
+    # Fetch previous drafts for LLM context (if force=True, we still want history context to improve upon)
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
             history_resp = await client.get(
@@ -365,32 +365,18 @@ async def draft_response(consideration_id: str, force: bool = False):
         except Exception:
             previous_drafts = []
 
-    if previous_drafts:
-        latest = previous_drafts[-1]  # Most recent draft
-        logger.info(
-            "Cache hit: returning existing draft for consideration %s (draft id: %s)",
-            consideration_id, latest.get("id", "?"),
-        )
-        return DraftResponseResult(
-            draft_id=latest.get("id", "cached"),
-            consideration_id=consideration_id,
-            draft_text=latest.get("draft_text", ""),
-            risk_score=latest.get("risk_score") or 0.5,
-            created_at=latest.get("created_at", ""),
-        )
-
     # Step 3: No cached draft — generate via LLM
     draft_text = await _generate_draft_with_gemini(
         concern_text=concern_text,
         rfi_context=rfi_context,
-        previous_drafts=[],
+        previous_drafts=previous_drafts,
     )
 
     # Step 4: Predict risk score
     risk_score = _predict_risk_score(
         concern_text=concern_text,
         draft_text=draft_text,
-        previous_drafts=[],
+        previous_drafts=previous_drafts,
     )
 
     # Step 5: Save draft to Layer 2

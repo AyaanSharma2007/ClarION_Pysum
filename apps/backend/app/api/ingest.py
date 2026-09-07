@@ -150,7 +150,11 @@ async def parse_pdf(file: UploadFile = File(...)):
 
     prompt = f"""
 You are an expert regulatory document parsing agent for EU CTR validation RFIs.
-Extract all required fields from the attached RFI PDF document and format the result as a strict JSON object.
+
+CRITICAL FIRST STEP: SILENT CHECK
+Evaluate the attached PDF. If it does not appear to be a genuine clinical trial regulatory document or RFI (e.g., if it is a random receipt, generic text, or unrelated document), you MUST immediately return exactly this JSON: {{"error": "try again"}} and NOTHING ELSE.
+
+If it IS a valid RFI, extract all required fields and format the result as a strict JSON object.
 
 IMPORTANT: We ONLY want the problems/concerns stated in the RFI by the NCA authority.
 Do NOT extract the sponsor's response. Set the "response" field to null for every consideration.
@@ -159,15 +163,15 @@ The JSON output MUST conform exactly to the following JSON Schema:
 {schema_json}
 
 Field Guidelines:
-- rfi_id: Unique RFI identifier as printed in document (e.g. 'CT-2024-123456-12-00-SM01-001').
+- rfi_id: Unique RFI identifier as printed in document (do NOT use placeholder/mock data).
 - due_date, response_date, submit_date: Format strictly as YYYY-MM-DD. Convert from dd/mm/yyyy if needed.
-- msc.country: Member State Concerned as printed (e.g. 'Germany'). Non-empty string.
-- indication.name: Full standard name of therapeutic indication (e.g. 'Type 2 Diabetes Mellitus').
+- msc.country: Member State Concerned as printed. Non-empty string.
+- indication.name: Full standard name of therapeutic indication as printed (do NOT hallucinate or use mock data like 'Type 2 Diabetes Mellitus' if it's not actually in the text).
 - considerations: List of individual consideration objects (min 1 item required).
   - number: Integer consideration number.
-  - concern_text: CRITICAL — extract the NCA authority's question, concern, or objection text verbatim. This is the question ASKED BY the authority (e.g. 'Please provide evidence that...', 'Clarify the protocol section...'). If labelled as 'Concern', 'Question', 'RFI text', or 'Authority comment', extract it here. Do NOT leave this null if any concern/question text exists.
-  - ctr_article.name: Referenced section/article/annex (e.g. 'Annex I, Section 63').
-  - response: ALWAYS set to null. Do NOT extract the sponsor's response text.
+  - concern_text: CRITICAL — extract the NCA authority's question, concern, or objection text verbatim.
+  - ctr_article.name: Referenced section/article/annex.
+  - response: ALWAYS set to null.
   - outcome: Optional object with status string or null.
 
 Return ONLY raw valid JSON, wrapped inside a JSON code block. No explanations or extra text.
@@ -240,13 +244,15 @@ Return ONLY raw valid JSON, wrapped inside a JSON code block. No explanations or
                 raw_text = raw_text.strip()
 
                 extracted_json = json.loads(raw_text)
+                if extracted_json.get("error") == "try again":
+                    raise HTTPException(status_code=400, detail="try again")
                 validated_model = RFIExtractionTemplate.model_validate(extracted_json)
                 return validated_model
 
         except ValidationError as val_err:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Gemini response failed Pydantic validation: {val_err}"
+                detail="try again"
             )
         except HTTPException:
             raise
@@ -303,13 +309,15 @@ Return ONLY raw valid JSON, wrapped inside a JSON code block. No explanations or
             raw_text = raw_text.strip()
 
             extracted_json = json.loads(raw_text)
+            if extracted_json.get("error") == "try again":
+                raise HTTPException(status_code=400, detail="try again")
             validated_model = RFIExtractionTemplate.model_validate(extracted_json)
             return validated_model
 
         except ValidationError as val_err:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Claude response failed Pydantic validation: {val_err}"
+                detail="try again"
             )
         except Exception as err:
             raise HTTPException(
@@ -352,13 +360,15 @@ Return ONLY raw valid JSON, wrapped inside a JSON code block. No explanations or
             raw_text = raw_text.strip()
             
             extracted_json = json.loads(raw_text)
+            if extracted_json.get("error") == "try again":
+                raise HTTPException(status_code=400, detail="try again")
             validated_model = RFIExtractionTemplate.model_validate(extracted_json)
             return validated_model
             
         except ValidationError as val_err:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Ollama response failed Pydantic validation: {val_err}"
+                detail="try again"
             )
         except Exception as err:
             raise HTTPException(

@@ -78,6 +78,18 @@ export const searchSemantic = async (queryText, topK = 5, ownerTeam = 'EU-Hub-Re
   }
 };
 
+export const searchRecommend = async (concernText, topK = 5) => {
+  try {
+    const res = await axios.post(`${LAYER2_URL}/search/recommend`, {
+      concern_text: concernText,
+      top_k: topK
+    });
+    return res.data;
+  } catch (err) {
+    throw err.response?.data || err;
+  }
+};
+
 export const searchHybrid = async (queryText, topK = 5, ownerTeam = 'EU-Hub-Regulatory') => {
   try {
     const res = await axios.post(

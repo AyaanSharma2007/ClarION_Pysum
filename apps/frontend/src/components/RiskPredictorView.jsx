@@ -222,7 +222,7 @@ export default function RiskPredictorView() {
         <div style={S.card}>
           <div>
             <div style={S.cardTitle}>
-              <span>📋 Draft CTA Dossier Configuration</span>
+              <span> Draft CTA Dossier Configuration</span>
               <span style={{ fontSize: 11, color: '#666', fontFamily: '"JetBrains Mono", monospace' }}>12 Structural Parameters</span>
             </div>
             <div style={S.cardSub}>Deterministic structural metadata — zero LLM evaluation</div>
@@ -379,7 +379,7 @@ export default function RiskPredictorView() {
         <div style={S.card}>
           <div>
             <div style={S.cardTitle}>
-              <span>📊 Predicted RFI Category Likelihoods</span>
+              <span> Predicted RFI Category Likelihoods</span>
               <span style={{ fontSize: 11, color: '#4ade80', fontFamily: '"JetBrains Mono", monospace' }}>SHAP Verified</span>
             </div>
             <div style={S.cardSub}>Click any category to inspect feature drivers</div>
@@ -414,7 +414,7 @@ export default function RiskPredictorView() {
           {selectedCategory && (
             <div style={S.shapBox}>
               <div style={S.shapHead}>
-                <span>🔍 SHAP Feature Drivers — {CATEGORY_LABELS[selectedCategory]}</span>
+                <span> SHAP Feature Drivers — {CATEGORY_LABELS[selectedCategory]}</span>
                 <span style={{ fontSize: 10, color: '#888' }}>TreeExplainer</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -432,7 +432,7 @@ export default function RiskPredictorView() {
 
           {/* Mandatory Regulatory Disclaimer */}
           <div style={S.disclaimerBox}>
-            <strong>⚠️ Mandatory Regulatory Guardrail (§5 Decision Table):</strong><br />
+            <strong>️ Mandatory Regulatory Guardrail (§5 Decision Table):</strong><br />
             {result?.disclaimer ||
               'These are probabilistic likelihood estimates derived from an ML classifier (GradientBoostingClassifier + SHAP). They suggest risk — they do NOT make binding regulatory decisions.'}
           </div>

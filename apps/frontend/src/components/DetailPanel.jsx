@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { advanceRfiStage, searchSemantic, draftAiResponse, getDraftHistory, evaluateManualDraft } from '../services/api';
+import { advanceRfiStage, searchSemantic, searchRecommend, draftAiResponse, getDraftHistory, evaluateManualDraft } from '../services/api';
 import MiniProgressBar from './MiniProgressBar';
+import SimilarResponsesModal from './SimilarResponsesModal';
 
 const STAGE_ORDER = ['awaiting_response', 'drafting', 'pending_approval', 'approved', 'submitted'];
 const STAGE_LABELS = {
@@ -92,10 +93,10 @@ const s = {
     zIndex: 1,
   },
   rfiId: {
-    fontFamily: "'JetBrains Mono', monospace",
-    fontSize: 13,
-    fontWeight: 700,
+    fontSize: 14,
+    fontWeight: 600,
     color: 'var(--text)',
+    letterSpacing: '0.02em',
     marginBottom: 4,
   },
   subtitle: { fontSize: 14, color: 'var(--text-muted)' },
@@ -191,6 +192,22 @@ const s = {
     fontWeight: 700,
     fontFamily: "'JetBrains Mono', monospace",
     color: pct <= 40 ? 'var(--red)' : pct <= 70 ? 'var(--amber)' : 'var(--green)',
+  }),
+  acceptanceBarFill: (pct) => {
+    const color = pct < 50 ? 'var(--red)' : pct <= 65 ? 'var(--amber)' : 'var(--green)';
+    return {
+      height: '100%',
+      width: `${pct}%`,
+      borderRadius: 4,
+      background: color,
+      transition: 'width 0.6s ease',
+    };
+  },
+  acceptancePct: (pct) => ({
+    fontSize: 13,
+    fontWeight: 700,
+    fontFamily: "'JetBrains Mono', monospace",
+    color: pct < 50 ? 'var(--red)' : pct <= 65 ? 'var(--amber)' : 'var(--green)',
   }),
   considerationCard: {
     background: 'var(--bg-card)',
@@ -457,14 +474,14 @@ function ConsiderationCard({ c, index, initialDraft, currentStage }) {
 
       {c.concern_text ? (
         <div>
-          <div style={s.textLabel}>🔴 Concern (NCA Question)</div>
+          <div style={s.textLabel}> Concern (NCA Question)</div>
           <div style={s.concernBlock}>{c.concern_text}</div>
         </div>
       ) : null}
 
       {c.outcome_status && (
         <div style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600 }}>
-          ✓ Outcome: {c.outcome_status}
+           Outcome: {c.outcome_status}
         </div>
       )}
 
@@ -476,16 +493,16 @@ function ConsiderationCard({ c, index, initialDraft, currentStage }) {
             disabled={drafting || !c.concern_text || !c.id}
             onClick={() => handleDraft(Boolean(draft))}
           >
-            {drafting ? 'Generating AI Draft...' : draft ? '↻ Regenerate Draft' : '✨ Draft Response'}
+            {drafting ? 'Generating AI Draft...' : draft ? ' Regenerate Draft' : ' Draft Response'}
           </button>
         ) : (
           <div style={{ ...s.loadingText, fontStyle: 'normal', color: 'var(--text-dim)', fontSize: 12 }}>
-            ✏ Draft available once stage is <strong>Awaiting Response</strong> or <strong>Drafting</strong>.
+             Draft available once stage is <strong>Awaiting Response</strong> or <strong>Drafting</strong>.
           </div>
         )}
         {draftError && (
           <div style={{ marginTop: 8, fontSize: 12, color: 'var(--red)', padding: '8px 12px', background: 'var(--red-light)', borderRadius: 'var(--radius-sm)' }}>
-            ⚠ {draftError}
+             {draftError}
           </div>
         )}
 
@@ -514,9 +531,9 @@ function ConsiderationCard({ c, index, initialDraft, currentStage }) {
           <div style={{ marginTop: 14 }}>
             <div style={{ ...s.textLabel, marginBottom: 8 }}>Risk Assessment (Acceptance Probability)</div>
             <div style={{ ...s.riskBarTrack, marginBottom: 6 }}>
-              <div style={s.riskBarFill(Math.round(draftRisk * 100))} />
+              <div style={s.acceptanceBarFill(Math.round(draftRisk * 100))} />
             </div>
-            <div style={s.riskPct(Math.round(draftRisk * 100))}>
+            <div style={s.acceptancePct(Math.round(draftRisk * 100))}>
               {Math.round(draftRisk * 100)}% Probability of Acceptance
             </div>
           </div>
@@ -533,6 +550,7 @@ export default function DetailPanel({ rfi, onClose, onStageAdvanced }) {
   const [currentStage, setCurrentStage] = useState(rfi.workflow_state?.current_stage || rfi.status || 'received');
   const [recommendations, setRecommendations] = useState([]);
   const [recsLoading, setRecsLoading] = useState(false);
+  const [showSimilarModal, setShowSimilarModal] = useState(false);
 
   useEffect(() => {
     setCurrentStage(rfi.workflow_state?.current_stage || rfi.status || 'received');
@@ -545,8 +563,8 @@ export default function DetailPanel({ rfi, onClose, onStageAdvanced }) {
     const firstConcern = rfi.considerations?.find(c => c.concern_text)?.concern_text;
     if (!firstConcern) { setRecommendations([]); return; }
     setRecsLoading(true);
-    searchSemantic(firstConcern, 3)
-      .then(res => setRecommendations(res.results?.slice(0, 3) || []))
+    searchRecommend(firstConcern, 3)
+      .then(res => setRecommendations(res.results || []))
       .catch(err => { console.error('[DetailPanel] Recommendations fetch failed:', err); setRecommendations([]); })
       .finally(() => setRecsLoading(false));
   }, [rfi.id]);
@@ -573,7 +591,7 @@ export default function DetailPanel({ rfi, onClose, onStageAdvanced }) {
   }, [rfi.id, currentIdx, advancing, onStageAdvanced]);
 
   // Collect best suggested draft text from recommendations
-  const suggestedDraft = recommendations[0]?.rfi?.considerations?.[0]?.response_text || '';
+  const suggestedDraft = recommendations[0]?.response_text || '';
 
   return (
     <div style={s.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
@@ -591,7 +609,7 @@ export default function DetailPanel({ rfi, onClose, onStageAdvanced }) {
             onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
             onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
           >
-            ✕ Close
+             Close
           </button>
         </div>
 
@@ -607,7 +625,7 @@ export default function DetailPanel({ rfi, onClose, onStageAdvanced }) {
 
           {/* Details */}
           <div>
-            <div style={s.sectionTitle}>📋 Details</div>
+            <div style={s.sectionTitle}> Details</div>
             <div style={s.metaGrid}>
               {[['Country', rfi.nca_country], ['Category', rfi.category], ['Submit Date', rfi.submit_date], ['Due Date', rfi.due_date]].map(([label, value]) => (
                 <div key={label} style={s.metaBox}>
@@ -623,7 +641,7 @@ export default function DetailPanel({ rfi, onClose, onStageAdvanced }) {
           {/* Considerations */}
           {rfi.considerations?.length > 0 && (
             <div>
-              <div style={s.sectionTitle}>📝 Considerations ({rfi.considerations.length})</div>
+              <div style={s.sectionTitle}> Considerations ({rfi.considerations.length})</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {rfi.considerations.map((c, i) => (
                   <ConsiderationCard key={c.id || i} c={c} index={i} initialDraft={i === 0 ? suggestedDraft : ''} currentStage={currentStage} />
@@ -634,16 +652,11 @@ export default function DetailPanel({ rfi, onClose, onStageAdvanced }) {
 
           {/* Similar Past Responses */}
           <div>
-            <div style={s.sectionTitle}>💡 Similar Past Responses</div>
+            <div style={s.sectionTitle}> Similar Past Responses</div>
             {recsLoading ? (
               <div style={s.loadingText}>Searching regulatory memory…</div>
             ) : (() => {
-              const validRecs = recommendations.filter(rec => {
-                const text = rec.rfi?.considerations?.find(c => c.response_text)?.response_text || rec.rfi?.considerations?.[0]?.response_text || rec.rfi?.rfi_text;
-                return text && text.trim() && text !== 'No response text available.';
-              });
-
-              if (validRecs.length === 0) {
+              if (recommendations.length === 0) {
                 return (
                   <div style={{ ...s.loadingText, padding: '12px 16px', background: 'var(--bg-card)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', color: 'var(--text-dim)', fontStyle: 'normal' }}>
                     No similar past responses found.
@@ -652,21 +665,15 @@ export default function DetailPanel({ rfi, onClose, onStageAdvanced }) {
               }
 
               return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {validRecs.map((rec, i) => {
-                    const respText = rec.rfi?.considerations?.find(c => c.response_text)?.response_text || rec.rfi?.considerations?.[0]?.response_text || rec.rfi?.rfi_text;
-                    const matchScore = Math.round((rec.score || 0) * 100);
-                    return (
-                      <div key={i} style={s.recommendCard}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--green)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>
-                          Similar Case #{i + 1} · Match {matchScore}%
-                        </div>
-                        <div style={{ color: 'var(--text)' }}>
-                          {respText}
-                        </div>
-                      </div>
-                    );
-                  })}
+                <div>
+                  <button
+                    onClick={() => setShowSimilarModal(true)}
+                    style={s.scoreBtn(false)}
+                    onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 4px 14px rgba(240,98,146,0.45)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 2px 10px rgba(240,98,146,0.3)'; }}
+                  >
+                    View Similar ({recommendations.length})
+                  </button>
                 </div>
               );
             })()}
@@ -674,11 +681,11 @@ export default function DetailPanel({ rfi, onClose, onStageAdvanced }) {
 
           {/* Workflow Stage */}
           <div>
-            <div style={s.sectionTitle}>🔄 Workflow Stage</div>
+            <div style={s.sectionTitle}> Workflow Stage</div>
             <div style={s.stageWrap}>
               {STAGE_ORDER.map((stage, idx) => (
                 <div key={stage} style={s.stagePill(idx === currentIdx, idx < currentIdx)}>
-                  {idx < currentIdx ? '✓ ' : ''}{STAGE_LABELS[stage]}
+                  {idx < currentIdx ? ' ' : ''}{STAGE_LABELS[stage]}
                 </div>
               ))}
             </div>
@@ -697,13 +704,19 @@ export default function DetailPanel({ rfi, onClose, onStageAdvanced }) {
               </>
             ) : (
               <div style={{ ...s.statusMsg(true), marginTop: 12 }}>
-                ✓ This RFI has been fully submitted.
+                 This RFI has been fully submitted.
               </div>
             )}
           </div>
 
         </div>
       </div>
+      {showSimilarModal && (
+        <SimilarResponsesModal
+          recommendations={recommendations}
+          onClose={() => setShowSimilarModal(false)}
+        />
+      )}
     </div>
   );
 }
