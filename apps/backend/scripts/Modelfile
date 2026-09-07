@@ -1,4 +1,4 @@
-FROM /home/yug-porwal/ClarION_Pysum/apps/backend/models/clarion_qwen_q4km.gguf
+FROM ../models/clarion_qwen_q4km.gguf
 
 TEMPLATE """{{ if .System }}<|im_start|>system
 {{ .System }}<|im_end|>
