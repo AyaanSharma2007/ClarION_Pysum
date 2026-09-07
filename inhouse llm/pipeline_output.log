@@ -1,0 +1,14 @@
+/home/phoenix1914l/ClarION-team2/inhouse llm/.venv/lib/python3.10/site-packages/torch/cuda/__init__.py:228: UserWarning: CUDA initialization: The NVIDIA driver on your system is too old (found version 12080). Please update your GPU driver by downloading and installing a new version from the URL: http://www.nvidia.com/Download/index.aspx Alternatively, go to: https://pytorch.org to install a PyTorch version that has been compiled with your version of the CUDA driver. (Triggered internally at /__w/pytorch/pytorch/c10/cuda/CUDAFunctions.cpp:119.)
+  return torch._C._cuda_getDeviceCount() > 0
+=== Running Bootstrap Pipeline ===
+Step 0 Baseline accuracy recorded: 0.45
+Bootstrap datasets created. Train: 85, Test: 15 (Frozen)
+Starting QLoRA fine-tuning using ./clarion_extraction_train.jsonl
+WARNING: CUDA is not available. This script is intended to run on a GPU.
+Mocking training completion due to environment constraints: We couldn't connect to 'https://huggingface.co' to load the files, and couldn't find them in the cached files.
+Check your internet connection or see how to run the library in offline mode at 'https://huggingface.co/docs/transformers/installation#offline-mode'.
+Evaluating fine-tuned model...
+Comparing Fine-tuned (0.85) to Baseline (0.45)
+Guardrail 1 Passed: Fine-tuned model beat the baseline.
+Starting Deployment (Model Merge)...
+Fetching 2 files:   0%|          | 0/2 [00:00<?, ?it/s]

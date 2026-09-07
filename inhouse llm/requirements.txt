@@ -1,0 +1,8 @@
+transformers
+peft
+bitsandbytes
+accelerate
+datasets
+trl
+torch
+psycopg2-binary

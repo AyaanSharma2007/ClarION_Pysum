@@ -122,10 +122,9 @@ async def _upsert_ctr_article(db: AsyncSession, name: str) -> CTRArticle:
     return article
 
 
-def _sla_due_at() -> datetime:
-    return datetime.now(tz=timezone.utc) + timedelta(
-        hours=settings.SLA_HOURS_DEFAULT
-    )
+def _sla_due_at(rfi_type: str | None = None) -> datetime:
+    days = 12 if rfi_type == "assessment" else 10
+    return datetime.now(tz=timezone.utc) + timedelta(days=days)
 
 
 async def _ingest_one(db: AsyncSession, payload: RFICreate) -> RFI:
@@ -247,7 +246,7 @@ async def _ingest_one(db: AsyncSession, payload: RFICreate) -> RFI:
         rfi_id=rfi.id,
         current_stage="awaiting_response",
         stage_entered_at=datetime.now(tz=timezone.utc),
-        sla_due_at=_sla_due_at(),
+        sla_due_at=_sla_due_at(getattr(payload, 'rfi_type', None)),
     )
     db.add(workflow)
 
@@ -468,7 +467,7 @@ async def advance_stage(
     # Update WorkflowState
     rfi.workflow_state.current_stage = body.stage
     rfi.workflow_state.stage_entered_at = datetime.now(tz=timezone.utc)
-    rfi.workflow_state.sla_due_at = _sla_due_at()
+    rfi.workflow_state.sla_due_at = _sla_due_at(rfi.rfi_type)
 
     # Sync rfi.status with workflow stage (Bible §7 status enum)
     rfi.status = body.stage

@@ -131,7 +131,8 @@ class EventDispatcher:
         now = datetime.now(tz=timezone.utc)
         rfi.workflow_state.current_stage = target_stage
         rfi.workflow_state.stage_entered_at = now
-        rfi.workflow_state.sla_due_at = now + timedelta(hours=settings.SLA_HOURS_DEFAULT)
+        days = 12 if getattr(rfi, "rfi_type", None) == "assessment" else 10
+        rfi.workflow_state.sla_due_at = now + timedelta(days=days)
 
         # 6. Sync rfi.status (Bible §7 status enum)
         rfi.status = target_stage

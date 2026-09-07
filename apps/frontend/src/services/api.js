@@ -198,6 +198,15 @@ export const draftAiResponse = async (considerationId, force = false) => {
   }
 };
 
+export const evaluateManualDraft = async (considerationId, draftText) => {
+  try {
+    const res = await axios.post(`${LAYER1_URL}/api/draft/${considerationId}/evaluate`, { draft_text: draftText });
+    return res.data;
+  } catch (err) {
+    throw err.response?.data || err;
+  }
+};
+
 export const getDraftHistory = async (considerationId) => {
   try {
     const res = await axios.get(`${LAYER1_URL}/api/draft/${considerationId}/history`);

@@ -41,8 +41,9 @@ class Settings(BaseSettings):
     VOYAGE_API_KEY: str | None = None
 
     # ── Entity Extraction ─────────────────────────────────────────────────────
-    EXTRACTION_BACKEND: Literal["stub", "claude", "ollama", "local"] = "stub"
+    EXTRACTION_BACKEND: Literal["stub", "claude", "ollama", "local", "gemini"] = "stub"
     ANTHROPIC_API_KEY: str | None = None
+    GEMINI_API_KEY: str | None = None
     OLLAMA_HOST: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "llama3.1"
 

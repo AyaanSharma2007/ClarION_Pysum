@@ -20,11 +20,13 @@ from LAYER2.layer2.tests.conftest import SAMPLE_RFI
 @pytest.mark.asyncio
 async def test_ingest_single_rfi(client: AsyncClient):
     """POST /rfi with the example payload returns 201 and a valid UUID."""
-    resp = await client.post("/rfi", json=SAMPLE_RFI)
+    import uuid as _uuid
+    unique_id = f"CT-TEST-{_uuid.uuid4().hex[:8].upper()}"
+    resp = await client.post("/rfi", json={**SAMPLE_RFI, "rfi_id": unique_id})
     assert resp.status_code == 201, resp.text
 
     data = resp.json()
-    assert data["rfi_id"] == SAMPLE_RFI["rfi_id"]
+    assert data["rfi_id"] == unique_id
     assert data["nca_country"] == "Germany"
     assert data["therapeutic_area_name"] == "Type 2 Diabetes Mellitus"
     assert len(data["considerations"]) == 1
@@ -33,7 +35,7 @@ async def test_ingest_single_rfi(client: AsyncClient):
         == "Part I - Regulatory / Annex I, Section 63"
     )
     assert "provide proof of payment" in data["considerations"][0]["concern_text"]
-    assert data["workflow_state"]["current_stage"] == "Received"
+    assert data["workflow_state"]["current_stage"] == "awaiting_response"
     assert data["workflow_state"]["sla_due_at"] is not None
     # Embedding is not exposed in RFIRead — just check the record is stored
     assert "id" in data
@@ -42,10 +44,12 @@ async def test_ingest_single_rfi(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_ingest_duplicate_returns_409(client: AsyncClient):
     """Posting the same rfi_id twice returns 409 Conflict."""
-    # First insert (may already exist from previous test)
-    await client.post("/rfi", json=SAMPLE_RFI)
+    import uuid as _uuid
+    unique_id = f"CT-DUP-{_uuid.uuid4().hex[:8].upper()}"
+    # First insert
+    await client.post("/rfi", json={**SAMPLE_RFI, "rfi_id": unique_id})
     # Second insert — must fail
-    resp = await client.post("/rfi", json=SAMPLE_RFI)
+    resp = await client.post("/rfi", json={**SAMPLE_RFI, "rfi_id": unique_id})
     assert resp.status_code == 409
     assert "Duplicate" in resp.json()["detail"]
 
@@ -56,9 +60,12 @@ async def test_ingest_batch_mixed(client: AsyncClient):
     Batch of 3 records: 2 new, 1 duplicate.
     Returns 207 with 2 created and 1 error.
     """
-    new_a = {**SAMPLE_RFI, "rfi_id": "CT-BATCH-001"}
-    new_b = {**SAMPLE_RFI, "rfi_id": "CT-BATCH-002"}
-    dup = {**SAMPLE_RFI, "rfi_id": "CT-BATCH-001"}  # duplicate of new_a
+    import uuid as _uuid
+    id_a = f"CT-BATCH-{_uuid.uuid4().hex[:8].upper()}-A"
+    id_b = f"CT-BATCH-{_uuid.uuid4().hex[:8].upper()}-B"
+    new_a = {**SAMPLE_RFI, "rfi_id": id_a}
+    new_b = {**SAMPLE_RFI, "rfi_id": id_b}
+    dup = {**SAMPLE_RFI, "rfi_id": id_a}  # duplicate of new_a
 
     resp = await client.post("/rfi/batch", json={"records": [new_a, new_b, dup]})
     assert resp.status_code == 207, resp.text
@@ -66,14 +73,16 @@ async def test_ingest_batch_mixed(client: AsyncClient):
     data = resp.json()
     assert len(data["created"]) == 2
     assert len(data["errors"]) == 1
-    assert data["errors"][0]["rfi_id"] == "CT-BATCH-001"
+    assert data["errors"][0]["rfi_id"] == id_a
 
 
 @pytest.mark.asyncio
 async def test_get_rfi_by_id(client: AsyncClient):
     """GET /rfi/{id} returns the full record."""
+    import uuid as _uuid
+    unique_id = f"CT-GET-{_uuid.uuid4().hex[:8].upper()}"
     # Insert
-    ins = await client.post("/rfi", json={**SAMPLE_RFI, "rfi_id": "CT-GET-001"})
+    ins = await client.post("/rfi", json={**SAMPLE_RFI, "rfi_id": unique_id})
     assert ins.status_code == 201
     rfi_id = ins.json()["id"]
 
@@ -93,18 +102,20 @@ async def test_get_rfi_not_found(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_advance_stage(client: AsyncClient):
     """PATCH /rfi/{id}/stage advances stage and resets SLA."""
-    ins = await client.post("/rfi", json={**SAMPLE_RFI, "rfi_id": "CT-STAGE-001"})
+    import uuid as _uuid
+    unique_id = f"CT-STAGE-{_uuid.uuid4().hex[:8].upper()}"
+    ins = await client.post("/rfi", json={**SAMPLE_RFI, "rfi_id": unique_id})
     assert ins.status_code == 201
     rfi_id = ins.json()["id"]
     old_sla = ins.json()["workflow_state"]["sla_due_at"]
 
     resp = await client.patch(
         f"/rfi/{rfi_id}/stage",
-        json={"stage": "Categorized", "actor": "ml-pipeline", "notes": "Auto-classified"},
+        json={"stage": "drafting", "actor": "ml-pipeline", "notes": "Auto-classified"},
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["workflow_state"]["current_stage"] == "Categorized"
+    assert data["workflow_state"]["current_stage"] == "drafting"
     # SLA should have been reset (different timestamp)
     assert data["workflow_state"]["sla_due_at"] != old_sla
 
@@ -112,7 +123,9 @@ async def test_advance_stage(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_advance_stage_invalid(client: AsyncClient):
     """PATCH with an unknown stage name returns 400."""
-    ins = await client.post("/rfi", json={**SAMPLE_RFI, "rfi_id": "CT-STAGE-INV"})
+    import uuid as _uuid
+    unique_id = f"CT-STAGE-INV-{_uuid.uuid4().hex[:8].upper()}"
+    ins = await client.post("/rfi", json={**SAMPLE_RFI, "rfi_id": unique_id})
     rfi_id = ins.json()["id"]
 
     resp = await client.patch(
@@ -134,8 +147,8 @@ async def test_audit_chain_valid(client: AsyncClient):
     assert ins.status_code == 201, ins.text
     rfi_id = ins.json()["id"]
 
-    await client.patch(f"/rfi/{rfi_id}/stage", json={"stage": "Categorized"})
-    await client.patch(f"/rfi/{rfi_id}/stage", json={"stage": "RA_Clinical_Review"})
+    await client.patch(f"/rfi/{rfi_id}/stage", json={"stage": "drafting"})
+    await client.patch(f"/rfi/{rfi_id}/stage", json={"stage": "pending_approval"})
 
     resp = await client.get(f"/rfi/{rfi_id}/audit")
     assert resp.status_code == 200

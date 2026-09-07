@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 
-function getSlaInfo(sla_due_at) {
+function getSlaInfo(sla_due_at, rfi_type) {
   if (!sla_due_at) return { label: 'No SLA', color: 'var(--text-dim)', bg: '#f4f6fb', pct: 0 };
   const now = Date.now();
   const due = new Date(sla_due_at).getTime();
-  const totalMs = 72 * 60 * 60 * 1000;
+  const days = (rfi_type || '').toLowerCase() === 'assessment' ? 12 : 10;
+  const totalMs = days * 24 * 60 * 60 * 1000;
   const diffMs = due - now;
   if (diffMs <= 0) return { label: 'Overdue', color: 'var(--red)', bg: 'var(--red-light)', pct: 0 };
   const hours = Math.floor(diffMs / 3600000);
@@ -149,12 +150,13 @@ const s = {
   emptyIcon: { fontSize: 36, marginBottom: 12 },
 };
 
-function SlaTimer({ sla_due_at }) {
-  const [info, setInfo] = useState(() => getSlaInfo(sla_due_at));
+function SlaTimer({ sla_due_at, rfi_type }) {
+  const [info, setInfo] = useState(() => getSlaInfo(sla_due_at, rfi_type));
   useEffect(() => {
-    const t = setInterval(() => setInfo(getSlaInfo(sla_due_at)), 30000);
+    setInfo(getSlaInfo(sla_due_at, rfi_type));
+    const t = setInterval(() => setInfo(getSlaInfo(sla_due_at, rfi_type)), 30000);
     return () => clearInterval(t);
-  }, [sla_due_at]);
+  }, [sla_due_at, rfi_type]);
 
   return <div style={s.slaBadge(info.color, info.bg)}>{info.label}</div>;
 }
@@ -184,7 +186,7 @@ export default function RfiList({ rfis, pendingUploads, selectedId, onSelect }) 
       ))}
 
       {rfis.map(rfi => {
-        const sla = getSlaInfo(rfi.workflow_state?.sla_due_at);
+        const sla = getSlaInfo(rfi.workflow_state?.sla_due_at, rfi.rfi_type);
         const stage = rfi.workflow_state?.current_stage || rfi.status || 'received';
         const isSelected = rfi.id === selectedId;
 
@@ -217,7 +219,7 @@ export default function RfiList({ rfis, pendingUploads, selectedId, onSelect }) 
             </div>
 
             <div style={s.slaRight}>
-              <SlaTimer sla_due_at={rfi.workflow_state?.sla_due_at} />
+              <SlaTimer sla_due_at={rfi.workflow_state?.sla_due_at} rfi_type={rfi.rfi_type} />
             </div>
           </div>
         );

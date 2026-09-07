@@ -421,26 +421,20 @@ async def ingest_rfi(payload: RFIExtractionTemplate, background_tasks: Backgroun
         prev_hash=None
     )
 
-    # Write to Supabase Postgres
+    # Write to Supabase Postgres (shadow store)
     supabase = get_supabase_client()
+    db_status = "skipped"
+    db_message = "Supabase not configured."
 
-    if not supabase:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Supabase is not configured. Set SUPABASE_URL and SUPABASE_KEY environment variables in apps/backend/.env"
-        )
-
-    try:
-        supabase.table("rfi_intake").insert(record_to_insert).execute()
-    except Exception as db_err:
-        logger.error("Supabase insert failed: %s", db_err)
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Supabase database write failed: {str(db_err)}"
-        )
-
-    db_status = "persisted"
-    db_message = "Record written to Supabase Postgres table 'rfi_intake'."
+    if supabase:
+        try:
+            supabase.table("rfi_intake").insert(record_to_insert).execute()
+            db_status = "persisted"
+            db_message = "Record written to Supabase Postgres table 'rfi_intake'."
+        except Exception as db_err:
+            logger.warning("Supabase insert failed (continuing to Layer 2): %s", db_err)
+            db_status = "warning"
+            db_message = f"Supabase warning: {str(db_err)}"
 
     # ── Forward to Layer 2 Central Repository ──────────────────────────────
     # Layer 2 stores the record in pgvector with per-consideration embeddings,

@@ -58,13 +58,13 @@ const STAGES = ['Received', 'RA_Clinical_Review', 'CTA_Mgmt_Review', 'EU_Hub_App
 const ALCOA = ['Attributable', 'Legible', 'Contemporaneous', 'Original', 'Accurate', 'Complete', 'Consistent', 'Enduring', 'Available'];
 
 // ─── SLA Countdown ────────────────────────────────────────────────────────────
-function SlaTimer({ dueDate, type = '72h' }) {
+function SlaTimer({ dueDate, type = '10d' }) {
   const [remaining, setRemaining] = useState('');
   const [pct, setPct] = useState(100);
   const [color, setColor] = useState('#4ade80');
 
   useEffect(() => {
-    const total = type === '72h' ? 72 * 3600 : 12 * 24 * 3600;
+    const total = type === '10d' ? 10 * 24 * 3600 : 12 * 24 * 3600;
     const tick = () => {
       const due = dueDate ? new Date(dueDate) : new Date(Date.now() + 48 * 3600 * 1000);
       const diff = Math.max(0, Math.floor((due - Date.now()) / 1000));
@@ -138,7 +138,7 @@ export default function RaClinicalView({ rfis, onRefresh }) {
         <div style={s.stat}>
           <div style={s.statLabel}>SLA On-Track</div>
           <div style={{ ...s.statValue, color: onTrack < rfis.length ? '#fbbf24' : '#4ade80' }}>{onTrack}/{rfis.length}</div>
-          <div style={s.statSub}>72h statutory window</div>
+          <div style={s.statSub}>10-day statutory window</div>
         </div>
         <div style={s.stat}>
           <div style={s.statLabel}>Pending Sign-Off</div>
@@ -163,7 +163,7 @@ export default function RaClinicalView({ rfis, onRefresh }) {
           <table style={s.table}>
             <thead>
               <tr>
-                {['RFI ID', 'MSC Country', 'Indication', 'CTR Article', 'Category', 'Stage', '72h SLA'].map(h => (
+                {['RFI ID', 'MSC Country', 'Indication', 'CTR Article', 'Category', 'Stage', '10-Day SLA'].map(h => (
                   <th key={h} style={s.th}>{h}</th>
                 ))}
               </tr>
@@ -186,7 +186,7 @@ export default function RaClinicalView({ rfis, onRefresh }) {
                     <td style={s.td}><span style={s.badge()}>{rfi.category}</span></td>
                     <td style={{ ...s.td, fontFamily: '"JetBrains Mono", monospace', fontSize: 10, color: '#666' }}>{rfi.stage}</td>
                     <td style={s.td}>
-                      <SlaTimer dueDate={rfi.due_date} type="72h" />
+                      <SlaTimer dueDate={rfi.due_date} type="10d" />
                     </td>
                   </tr>
                 );
@@ -211,8 +211,8 @@ export default function RaClinicalView({ rfis, onRefresh }) {
               {/* SLA Timers */}
               <div style={s.meta2}>
                 <div style={s.metaBox}>
-                  <div style={s.lbl}>72h Validation</div>
-                  <SlaTimer dueDate={selected.due_date} type="72h" />
+                  <div style={s.lbl}>10-Day Validation</div>
+                  <SlaTimer dueDate={selected.due_date} type="10d" />
                 </div>
                 <div style={s.metaBox}>
                   <div style={s.lbl}>12-Day Assessment</div>

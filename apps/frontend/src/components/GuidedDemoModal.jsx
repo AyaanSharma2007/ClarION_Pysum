@@ -19,7 +19,7 @@ const STEPS = [
   {
     id: 4, role: 'ra_clinical',
     title: 'Phase 4 — Submission Gate',
-    desc: 'Statutory SLA timer & human stage advancement. Enforces the strict 72-hour regulatory SLA countdown and requires explicit human sign-off before workflow advancement.',
+    desc: 'Statutory SLA timer & human stage advancement. Enforces the strict 10-day regulatory SLA countdown and requires explicit human sign-off before workflow advancement.',
   },
   {
     id: 5, role: 'executive',

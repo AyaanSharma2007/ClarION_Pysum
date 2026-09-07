@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { advanceRfiStage, searchSemantic, draftAiResponse, getDraftHistory } from '../services/api';
+import { advanceRfiStage, searchSemantic, draftAiResponse, getDraftHistory, evaluateManualDraft } from '../services/api';
 import MiniProgressBar from './MiniProgressBar';
 
 const STAGE_ORDER = ['awaiting_response', 'drafting', 'pending_approval', 'approved', 'submitted'];
@@ -19,11 +19,12 @@ const RISK_LABELS = {
   regulatory_admin: 'Regulatory Admin',
 };
 
-function getSlaInfo(sla_due_at) {
+function getSlaInfo(sla_due_at, rfi_type) {
   if (!sla_due_at) return { label: 'No SLA set', color: 'var(--text-dim)', bg: 'var(--bg)', pct: 0 };
   const now = Date.now();
   const due = new Date(sla_due_at).getTime();
-  const totalMs = 72 * 60 * 60 * 1000;
+  const days = (rfi_type || '').toLowerCase() === 'assessment' ? 12 : 10;
+  const totalMs = days * 24 * 60 * 60 * 1000;
   const diffMs = due - now;
   if (diffMs <= 0) return { label: 'OVERDUE', color: 'var(--red)', bg: 'var(--red-light)', pct: 0 };
   const hours = Math.floor(diffMs / 3600000);
@@ -176,7 +177,7 @@ const s = {
     overflow: 'hidden',
   },
   riskBarFill: (pct) => {
-    const color = pct >= 60 ? 'var(--red)' : pct >= 35 ? 'var(--amber)' : 'var(--green)';
+    const color = pct <= 40 ? 'var(--red)' : pct <= 70 ? 'var(--amber)' : 'var(--green)';
     return {
       height: '100%',
       width: `${pct}%`,
@@ -189,7 +190,7 @@ const s = {
     fontSize: 13,
     fontWeight: 700,
     fontFamily: "'JetBrains Mono', monospace",
-    color: pct >= 60 ? 'var(--red)' : pct >= 35 ? 'var(--amber)' : 'var(--green)',
+    color: pct <= 40 ? 'var(--red)' : pct <= 70 ? 'var(--amber)' : 'var(--green)',
   }),
   considerationCard: {
     background: 'var(--bg-card)',
@@ -337,12 +338,13 @@ const s = {
   },
 };
 
-function SlaTicker({ sla_due_at }) {
-  const [info, setInfo] = useState(() => getSlaInfo(sla_due_at));
+function SlaTicker({ sla_due_at, rfi_type }) {
+  const [info, setInfo] = useState(() => getSlaInfo(sla_due_at, rfi_type));
   useEffect(() => {
-    const t = setInterval(() => setInfo(getSlaInfo(sla_due_at)), 10000);
+    setInfo(getSlaInfo(sla_due_at, rfi_type));
+    const t = setInterval(() => setInfo(getSlaInfo(sla_due_at, rfi_type)), 10000);
     return () => clearInterval(t);
-  }, [sla_due_at]);
+  }, [sla_due_at, rfi_type]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 14px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
@@ -387,6 +389,7 @@ function ConsiderationCard({ c, index, initialDraft, currentStage }) {
   const [draft, setDraft] = useState('');
   const [draftRisk, setDraftRisk] = useState(null);
   const [drafting, setDrafting] = useState(false);
+  const [evaluating, setEvaluating] = useState(false);
   const [draftError, setDraftError] = useState('');
 
   const canDraft = ['awaiting_response', 'drafting'].includes(currentStage);
@@ -424,6 +427,22 @@ function ConsiderationCard({ c, index, initialDraft, currentStage }) {
       setDraftError(msg);
     } finally {
       setDrafting(false);
+    }
+  };
+
+  const handleEvaluateManual = async () => {
+    if (evaluating || !canDraft || !draft) return;
+    setEvaluating(true);
+    setDraftError('');
+    try {
+      const result = await evaluateManualDraft(c.id, draft);
+      setDraftRisk(result.risk_score);
+    } catch (err) {
+      console.error('[ConsiderationCard] Manual evaluation failed:', err);
+      const msg = err?.detail || err?.message || 'Failed to evaluate draft risk.';
+      setDraftError(msg);
+    } finally {
+      setEvaluating(false);
     }
   };
 
@@ -470,10 +489,24 @@ function ConsiderationCard({ c, index, initialDraft, currentStage }) {
           </div>
         )}
 
-        {draft && (
+        {(draft || canDraft) && (
           <div style={{ marginTop: 14 }}>
-            <div style={{ ...s.textLabel, color: 'var(--accent-pink)', marginBottom: 6 }}>AI Draft Response</div>
-            <div style={s.draftTextarea}>{draft}</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <div style={{ ...s.textLabel, color: 'var(--accent-pink)' }}>AI Draft Response</div>
+              <button
+                style={{ ...s.scoreBtn(evaluating), padding: '4px 10px', fontSize: 11 }}
+                disabled={evaluating || !draft || !c.id}
+                onClick={handleEvaluateManual}
+              >
+                {evaluating ? 'Evaluating...' : '⚖️ Evaluate Risk'}
+              </button>
+            </div>
+            <textarea 
+              style={s.draftTextarea}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder="Click '✨ Draft Response' to generate with AI, or type your response manually here..."
+            />
           </div>
         )}
 
@@ -567,7 +600,7 @@ export default function DetailPanel({ rfi, onClose, onStageAdvanced }) {
           {/* SLA */}
           <div>
             <div style={s.sectionTitle}>⏱ Time Remaining</div>
-            <SlaTicker sla_due_at={rfi.workflow_state?.sla_due_at} />
+            <SlaTicker sla_due_at={rfi.workflow_state?.sla_due_at} rfi_type={rfi.rfi_type} />
           </div>
 
           <div style={s.divider} />

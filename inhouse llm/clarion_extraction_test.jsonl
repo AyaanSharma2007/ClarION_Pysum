@@ -1,0 +1,15 @@
+{"instruction": "Extract structured fields from this RFI concern text.", "input": "Sample RFI 57", "output": "{\"category\": \"statistics\"}"}
+{"instruction": "Extract structured fields from this RFI concern text.", "input": "Sample RFI 61", "output": "{\"category\": \"statistics\"}"}
+{"instruction": "Extract structured fields from this RFI concern text.", "input": "Sample RFI 23", "output": "{\"category\": \"statistics\"}"}
+{"instruction": "Extract structured fields from this RFI concern text.", "input": "Sample RFI 37", "output": "{\"category\": \"statistics\"}"}
+{"instruction": "Extract structured fields from this RFI concern text.", "input": "Sample RFI 99", "output": "{\"category\": \"statistics\"}"}
+{"instruction": "Extract structured fields from this RFI concern text.", "input": "Sample RFI 53", "output": "{\"category\": \"statistics\"}"}
+{"instruction": "Extract structured fields from this RFI concern text.", "input": "Sample RFI 58", "output": "{\"category\": \"statistics\"}"}
+{"instruction": "Extract structured fields from this RFI concern text.", "input": "Sample RFI 95", "output": "{\"category\": \"statistics\"}"}
+{"instruction": "Extract structured fields from this RFI concern text.", "input": "Sample RFI 1", "output": "{\"category\": \"statistics\"}"}
+{"instruction": "Extract structured fields from this RFI concern text.", "input": "Sample RFI 75", "output": "{\"category\": \"statistics\"}"}
+{"instruction": "Extract structured fields from this RFI concern text.", "input": "Sample RFI 86", "output": "{\"category\": \"statistics\"}"}
+{"instruction": "Extract structured fields from this RFI concern text.", "input": "Sample RFI 63", "output": "{\"category\": \"statistics\"}"}
+{"instruction": "Extract structured fields from this RFI concern text.", "input": "Sample RFI 26", "output": "{\"category\": \"statistics\"}"}
+{"instruction": "Extract structured fields from this RFI concern text.", "input": "Sample RFI 30", "output": "{\"category\": \"statistics\"}"}
+{"instruction": "Extract structured fields from this RFI concern text.", "input": "Sample RFI 29", "output": "{\"category\": \"statistics\"}"}
