@@ -147,3 +147,15 @@ class RFIExtractionTemplate(BaseModel):
     @classmethod
     def validate_rfi_id(cls, v: str) -> str:
         return _validate_non_empty_string(v, "rfi_id")
+
+
+class ResponseCorrection(BaseModel):
+    """
+    Schema for capturing a human correction to an AI-drafted response.
+    Used for creating a continuous learning loop (labeled training data).
+    """
+    consideration_id: str = Field(..., description="The consideration ID this response belongs to.")
+    original_draft_id: str = Field(..., description="The ID of the AI draft that was corrected.")
+    corrected_response_text: str = Field(..., description="The final text approved/edited by the human.")
+    corrected_by: str = Field(..., description="The user/actor who made the correction.")
+    corrected_at: Optional[str] = Field(default=None, description="Timestamp of the correction.")

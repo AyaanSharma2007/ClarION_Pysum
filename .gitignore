@@ -22,3 +22,6 @@ venv/
 # .env.test.local
 # .env.production.local
 .DS_Store
+
+# Models
+apps/backend/models/

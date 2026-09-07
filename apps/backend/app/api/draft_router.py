@@ -29,7 +29,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/draft", tags=["AI Draft Response"])
 
 # ── LLM Configuration ──────────────────────────────────────────────────────────
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "clarion-qwen")
 LAYER2_URL = os.getenv("LAYER2_URL", "http://localhost:8001")
 
 
@@ -58,28 +59,16 @@ class DraftHistoryResponse(BaseModel):
     drafts: List[DraftHistoryItem]
 
 
-# ── Helper: Call Gemini to draft a response ────────────────────────────────────
+# ── Helper: Call Local Model to draft a response ───────────────────────────────
 
-async def _generate_draft_with_gemini(
+async def _generate_draft_with_local_model(
     concern_text: str,
     rfi_context: Dict[str, Any],
     previous_drafts: List[Dict[str, Any]],
 ) -> str:
     """
-    Call the Gemini API to generate a regulatory response draft.
-    Falls back to a template response if no API key is configured.
+    Call the local Ollama API to generate a regulatory response draft using our fine-tuned Qwen model.
     """
-    api_key = (GEMINI_API_KEY or os.getenv("GEMINI_API_KEY") or "").strip()
-    env_model = (os.getenv("GEMINI_MODEL") or "").strip()
-
-    if not api_key:
-        logger.warning("No GEMINI_API_KEY configured — returning template draft.")
-        return (
-            f"In response to the authority's concern regarding: \"{concern_text[:200]}...\"\n\n"
-            "The sponsor acknowledges this concern and provides the following clarification:\n\n"
-            "[Draft response generated without LLM — configure GEMINI_API_KEY in your .env to enable AI drafting.]"
-        )
-
     # Build context from previous drafts
     history_context = ""
     if previous_drafts:
@@ -93,71 +82,46 @@ async def _generate_draft_with_gemini(
     country = rfi_context.get("country", "Unknown")
     indication = rfi_context.get("indication", "Unknown")
 
-    prompt = f"""You are a senior regulatory affairs specialist drafting a sponsor response 
-to an EU CTR (Clinical Trial Regulation 536/2014) validation RFI.
+    prompt = f"Context: EU CTR Validation RFI\nMSC: {country}\nIndication: {indication}\nConcern: {concern_text}{history_context}"
+    system_prompt = "You are an expert regulatory affairs AI. Draft a professional response for the following EU CTR Validation RFI consideration. Keep it under 50 words."
 
-RFI Context:
-- Member State: {country}
-- Therapeutic Indication: {indication}
-
-NCA Authority's Concern/Question:
-{concern_text}
-{history_context}
-
-Instructions:
-1. Draft a professional, compliant sponsor response that directly addresses the authority's concern.
-2. Be specific, cite relevant regulatory sections where applicable.
-3. Use formal regulatory language appropriate for EU CTR submissions.
-4. The response should be concise and under 50 words.
-5. If previous drafts exist, improve upon them based on their acceptance scores.
-
-Draft the response now:"""
-
-    gemini_models = [
-        env_model,
-        "gemini-2.5-flash",
-        "gemini-flash-latest",
-        "gemini-2.5-pro",
-        "gemini-3.5-flash",
-    ]
-    seen = set()
-    models_to_try = [m.strip() for m in gemini_models if m and not (m.strip() in seen or seen.add(m.strip()))]
-
+    url = f"{OLLAMA_URL}/api/generate"
+    payload = {
+        "model": OLLAMA_MODEL,
+        "prompt": prompt,
+        "system": system_prompt,
+        "stream": False,
+        "options": {
+            "temperature": 0.2, # Low temperature for more deterministic/professional output
+            "top_p": 0.9,
+        }
+    }
+    
+    logger.info("Attempting Ollama API request for model '%s'", OLLAMA_MODEL)
     resp = None
     last_err_detail = ""
-    for model_name in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-        }
-        logger.info("Attempting Gemini API request for model '%s'", model_name)
-        try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                resp = await client.post(url, json=payload)
-                if resp.status_code == 200:
-                    logger.info("Successfully generated response using model '%s'", model_name)
-                    break
-                else:
-                    last_err_detail = f"Status {resp.status_code}: {resp.text}"
-                    logger.warning("Gemini model '%s' returned status %d: %s", model_name, resp.status_code, resp.text)
-                    # Retry with next model on: 404 (invalid model), 503 (high demand), 429 (rate limit)
-                    if resp.status_code in (404, 429, 503):
-                        continue
-                    else:
-                        break
-        except Exception as e:
-            last_err_detail = str(e)
-            logger.error("Gemini API call failed for model '%s': %s", model_name, e)
-            continue
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(url, json=payload)
+            if resp.status_code == 200:
+                logger.info("Successfully generated response using model '%s'", OLLAMA_MODEL)
+            else:
+                last_err_detail = f"Status {resp.status_code}: {resp.text}"
+                logger.warning("Ollama model '%s' returned status %d: %s", OLLAMA_MODEL, resp.status_code, resp.text)
+    except Exception as e:
+        last_err_detail = str(e)
+        logger.error("Ollama API call failed for model '%s': %s", OLLAMA_MODEL, e)
 
     if resp is None or resp.status_code != 200:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to get response from Gemini API. Status: {resp.status_code if resp else 'no response'} | Details: {last_err_detail}"
+        logger.warning(f"Failed to get response from Ollama API. Returning fallback template. Details: {last_err_detail}")
+        return (
+            f"In response to the authority's concern regarding: \"{concern_text[:200]}...\"\n\n"
+            "The sponsor acknowledges this concern and provides the following clarification:\n\n"
+            "[Draft response generated without LLM — make sure Ollama is running with the correct model.]"
         )
 
     res_data = resp.json()
-    raw_text = res_data["candidates"][0]["content"]["parts"][0]["text"].strip()
+    raw_text = res_data.get("response", "").strip()
     # Enforce 50‑word limit
     words = raw_text.split()
     if len(words) > 50:
@@ -302,8 +266,8 @@ async def draft_response(consideration_id: str, force: bool = False):
         except Exception:
             previous_drafts = []
 
-    # Step 3: No cached draft — generate via LLM
-    draft_text = await _generate_draft_with_gemini(
+    # Step 3: No cached draft — generate via local LLM
+    draft_text = await _generate_draft_with_local_model(
         concern_text=concern_text,
         rfi_context=rfi_context,
         previous_drafts=previous_drafts,
