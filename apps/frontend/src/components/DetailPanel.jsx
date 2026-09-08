@@ -355,13 +355,26 @@ const s = {
   },
 };
 
-function SlaTicker({ sla_due_at, rfi_type }) {
+function SlaTicker({ sla_due_at, rfi_type, isSubmitted }) {
   const [info, setInfo] = useState(() => getSlaInfo(sla_due_at, rfi_type));
   useEffect(() => {
     setInfo(getSlaInfo(sla_due_at, rfi_type));
     const t = setInterval(() => setInfo(getSlaInfo(sla_due_at, rfi_type)), 10000);
     return () => clearInterval(t);
   }, [sla_due_at, rfi_type]);
+
+  if (isSubmitted) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--green-light)', border: '1px solid rgba(45,184,122,0.3)', borderRadius: 'var(--radius-sm)' }}>
+        <span style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600 }}>
+          ✓ Response submitted on time to Health Authority
+        </span>
+        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--green)', padding: '2px 8px', background: 'rgba(45,184,122,0.15)', borderRadius: 12 }}>
+          COMPLETED
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 14px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)' }}>
@@ -402,7 +415,7 @@ function RiskBars({ predictions }) {
   );
 }
 
-function ConsiderationCard({ c, index, initialDraft, currentStage }) {
+function ConsiderationCard({ c, index, initialDraft, currentStage, rfi }) {
   const [draft, setDraft] = useState('');
   const [draftRisk, setDraftRisk] = useState(null);
   const [drafting, setDrafting] = useState(false);
@@ -474,108 +487,146 @@ function ConsiderationCard({ c, index, initialDraft, currentStage }) {
 
       {c.concern_text ? (
         <div>
-          <div style={s.textLabel}> Concern (NCA Question)</div>
+          <div style={s.textLabel}>📋 Concern (NCA Question)</div>
           <div style={s.concernBlock}>{c.concern_text}</div>
         </div>
       ) : null}
 
       {c.outcome_status && (
         <div style={{ fontSize: 12, color: 'var(--green)', fontWeight: 600 }}>
-           Outcome: {c.outcome_status}
+          ✓ Outcome: {c.outcome_status}
         </div>
       )}
 
-      {/* AI Draft Section */}
-      <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
-        {canDraft ? (
-          <button
-            style={s.scoreBtn(drafting)}
-            disabled={drafting || !c.concern_text || !c.id}
-            onClick={() => handleDraft(Boolean(draft))}
-          >
-            {drafting ? 'Generating AI Draft...' : draft ? ' Regenerate Draft' : ' Draft Response'}
-          </button>
-        ) : (
-          <div style={{ ...s.loadingText, fontStyle: 'normal', color: 'var(--text-dim)', fontSize: 12 }}>
-             Draft available once stage is <strong>Awaiting Response</strong> or <strong>Drafting</strong>.
+      {/* Official Submitted Response */}
+      {c.response_text ? (
+        <div style={{ marginTop: 14 }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 6,
+          }}>
+            <div style={{ ...s.textLabel, color: 'var(--green)', display: 'flex', alignItems: 'center', gap: 6, margin: 0 }}>
+              <span>✓ Official Submitted Response</span>
+            </div>
+            {rfi?.workflow_state?.approved_by && (
+              <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-dim)' }}>
+                Approved by {rfi.workflow_state.approved_by}
+              </span>
+            )}
           </div>
-        )}
-        {draftError && (
-          <div style={{ marginTop: 8, fontSize: 12, color: 'var(--red)', padding: '8px 12px', background: 'var(--red-light)', borderRadius: 'var(--radius-sm)' }}>
-             {draftError}
+          <div style={{
+            ...s.responseBlock,
+            background: 'var(--green-light)',
+            borderLeft: '3px solid var(--green)',
+            color: 'var(--text)',
+            fontSize: 13,
+            lineHeight: 1.6,
+          }}>
+            {c.response_text}
           </div>
-        )}
+        </div>
+      ) : null}
 
-        {(draft || canDraft) && (
-          <div style={{ marginTop: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <div style={{ ...s.textLabel, color: 'var(--accent-pink)' }}>AI Draft Response</div>
-              <button
-                style={{ ...s.scoreBtn(evaluating), padding: '4px 10px', fontSize: 11 }}
-                disabled={evaluating || !draft || !c.id}
-                onClick={handleEvaluateManual}
-              >
-                {evaluating ? 'Evaluating...' : '⚖️ Evaluate Risk'}
-              </button>
+      {/* AI Draft Section (only relevant if not already submitted) */}
+      {!c.response_text && (
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+          {canDraft ? (
+            <button
+              style={s.scoreBtn(drafting)}
+              disabled={drafting || !c.concern_text || !c.id}
+              onClick={() => handleDraft(Boolean(draft))}
+            >
+              {drafting ? 'Generating AI Draft...' : draft ? ' Regenerate Draft' : ' Draft Response'}
+            </button>
+          ) : (
+            <div style={{ ...s.loadingText, fontStyle: 'normal', color: 'var(--text-dim)', fontSize: 12 }}>
+              🔒 Draft available once stage is <strong>Awaiting Response</strong> or <strong>Drafting</strong>.
             </div>
-            <textarea 
-              style={s.draftTextarea}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder="Click '✨ Draft Response' to generate with AI, or type your response manually here..."
-            />
-          </div>
-        )}
+          )}
+          {draftError && (
+            <div style={{ marginTop: 8, fontSize: 12, color: 'var(--red)', padding: '8px 12px', background: 'var(--red-light)', borderRadius: 'var(--radius-sm)' }}>
+              ⚠️ {draftError}
+            </div>
+          )}
 
-        {draftRisk !== null && draftRisk !== undefined && (
-          <div style={{ marginTop: 14 }}>
-            <div style={{ ...s.textLabel, marginBottom: 8 }}>Risk Assessment (Acceptance Probability)</div>
-            <div style={{ ...s.riskBarTrack, marginBottom: 6 }}>
-              <div style={s.acceptanceBarFill(Math.round(draftRisk * 100))} />
+          {(draft || canDraft) && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <div style={{ ...s.textLabel, color: 'var(--accent-pink)' }}>AI Draft Response</div>
+                <button
+                  style={{ ...s.scoreBtn(evaluating), padding: '4px 10px', fontSize: 11 }}
+                  disabled={evaluating || !draft || !c.id}
+                  onClick={handleEvaluateManual}
+                >
+                  {evaluating ? 'Evaluating...' : '⚖️ Evaluate Risk'}
+                </button>
+              </div>
+              <textarea 
+                style={s.draftTextarea}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder="Click '✨ Draft Response' to generate with AI, or type your response manually here..."
+              />
             </div>
-            <div style={s.acceptancePct(Math.round(draftRisk * 100))}>
-              {Math.round(draftRisk * 100)}% Probability of Acceptance
+          )}
+
+          {draftRisk !== null && draftRisk !== undefined && (
+            <div style={{ marginTop: 14 }}>
+              <div style={{ ...s.textLabel, marginBottom: 8 }}>Risk Assessment (Acceptance Probability)</div>
+              <div style={{ ...s.riskBarTrack, marginBottom: 6 }}>
+                <div style={s.acceptanceBarFill(Math.round(draftRisk * 100))} />
+              </div>
+              <div style={s.acceptancePct(Math.round(draftRisk * 100))}>
+                {Math.round(draftRisk * 100)}% Probability of Acceptance
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-export default function DetailPanel({ rfi, onClose, onStageAdvanced }) {
+export default function DetailPanel({ rfi: propRfi, onClose, onStageAdvanced }) {
+  const [rfi, setRfi] = useState(propRfi);
   const [advancing, setAdvancing] = useState(false);
   const [stageMsg, setStageMsg] = useState('');
   const [stageMsgOk, setStageMsgOk] = useState(true);
-  const [currentStage, setCurrentStage] = useState(rfi.workflow_state?.current_stage || rfi.status || 'received');
+  const [currentStage, setCurrentStage] = useState(propRfi?.workflow_state?.current_stage || propRfi?.status || 'received');
   const [recommendations, setRecommendations] = useState([]);
   const [recsLoading, setRecsLoading] = useState(false);
   const [showSimilarModal, setShowSimilarModal] = useState(false);
 
   useEffect(() => {
-    setCurrentStage(rfi.workflow_state?.current_stage || rfi.status || 'received');
-  }, [rfi.id, rfi.workflow_state?.current_stage, rfi.status]);
+    setRfi(propRfi);
+    setCurrentStage(propRfi?.workflow_state?.current_stage || propRfi?.status || 'received');
+  }, [propRfi]);
 
   const currentIdx = STAGE_ORDER.indexOf(currentStage);
 
   // Load similar past responses
   useEffect(() => {
-    const firstConcern = rfi.considerations?.find(c => c.concern_text)?.concern_text;
+    const firstCons = rfi?.considerations?.find(c => c.concern_text);
+    const firstConcern = firstCons?.concern_text;
+    const firstConsId = firstCons?.consideration_id || firstCons?.id;
     if (!firstConcern) { setRecommendations([]); return; }
     setRecsLoading(true);
-    searchRecommend(firstConcern, 3)
+    searchRecommend(firstConcern, 5, firstConsId)
       .then(res => setRecommendations(res.results || []))
       .catch(err => { console.error('[DetailPanel] Recommendations fetch failed:', err); setRecommendations([]); })
       .finally(() => setRecsLoading(false));
-  }, [rfi.id]);
+  }, [rfi?.id]);
 
   const advanceToNext = useCallback(async () => {
     const nextStage = STAGE_ORDER[currentIdx + 1];
-    if (!nextStage || advancing) return;
+    if (!nextStage || advancing || !rfi?.id) return;
     setAdvancing(true);
     setStageMsg('');
     try {
       const updatedRfi = await advanceRfiStage(rfi.id, nextStage);
+      setRfi(updatedRfi);
       const newStage = updatedRfi.workflow_state?.current_stage || updatedRfi.status || nextStage;
       setCurrentStage(newStage);
       setStageMsgOk(true);
@@ -584,11 +635,12 @@ export default function DetailPanel({ rfi, onClose, onStageAdvanced }) {
     } catch (err) {
       console.error('[DetailPanel] Stage advance failed:', err);
       setStageMsgOk(false);
-      setStageMsg('Could not advance stage — check Layer 2 is running.');
+      const detail = err?.response?.data?.detail || err?.detail || err?.message || 'Could not advance stage — check Layer 2 is running.';
+      setStageMsg(typeof detail === 'string' ? detail : JSON.stringify(detail));
     } finally {
       setAdvancing(false);
     }
-  }, [rfi.id, currentIdx, advancing, onStageAdvanced]);
+  }, [rfi?.id, currentIdx, advancing, onStageAdvanced]);
 
   // Collect best suggested draft text from recommendations
   const suggestedDraft = recommendations[0]?.response_text || '';
@@ -618,16 +670,22 @@ export default function DetailPanel({ rfi, onClose, onStageAdvanced }) {
           {/* SLA */}
           <div>
             <div style={s.sectionTitle}>⏱ Time Remaining</div>
-            <SlaTicker sla_due_at={rfi.workflow_state?.sla_due_at} rfi_type={rfi.rfi_type} />
+            <SlaTicker sla_due_at={rfi.workflow_state?.sla_due_at} rfi_type={rfi.rfi_type} isSubmitted={currentStage === 'submitted'} />
           </div>
 
           <div style={s.divider} />
 
           {/* Details */}
           <div>
-            <div style={s.sectionTitle}> Details</div>
+            <div style={s.sectionTitle}>ℹ️ Details</div>
             <div style={s.metaGrid}>
-              {[['Country', rfi.nca_country], ['Category', rfi.category], ['Submit Date', rfi.submit_date], ['Due Date', rfi.due_date]].map(([label, value]) => (
+              {[
+                ['Country', rfi.nca_country],
+                ['Category', rfi.category],
+                ['Submit Date', rfi.submit_date],
+                ['Due Date', rfi.due_date],
+                ...(rfi.response_date ? [['Response Date', rfi.response_date]] : []),
+              ].map(([label, value]) => (
                 <div key={label} style={s.metaBox}>
                   <div style={s.metaLabel}>{label}</div>
                   <div style={s.metaValue}>{value || '—'}</div>
@@ -641,10 +699,17 @@ export default function DetailPanel({ rfi, onClose, onStageAdvanced }) {
           {/* Considerations */}
           {rfi.considerations?.length > 0 && (
             <div>
-              <div style={s.sectionTitle}> Considerations ({rfi.considerations.length})</div>
+              <div style={s.sectionTitle}>📋 Considerations ({rfi.considerations.length})</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {rfi.considerations.map((c, i) => (
-                  <ConsiderationCard key={c.id || i} c={c} index={i} initialDraft={i === 0 ? suggestedDraft : ''} currentStage={currentStage} />
+                  <ConsiderationCard
+                    key={c.id || i}
+                    c={c}
+                    index={i}
+                    initialDraft={i === 0 ? suggestedDraft : ''}
+                    currentStage={currentStage}
+                    rfi={rfi}
+                  />
                 ))}
               </div>
             </div>

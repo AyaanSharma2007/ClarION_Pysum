@@ -78,11 +78,13 @@ export const searchSemantic = async (queryText, topK = 5, ownerTeam = 'EU-Hub-Re
   }
 };
 
-export const searchRecommend = async (concernText, topK = 5) => {
+export const searchRecommend = async (concernText, topK = 5, excludeConsiderationId = null, minSimilarity = 0.35) => {
   try {
     const res = await axios.post(`${LAYER2_URL}/search/recommend`, {
       concern_text: concernText,
-      top_k: topK
+      top_k: topK,
+      exclude_consideration_id: excludeConsiderationId,
+      min_similarity: minSimilarity,
     });
     return res.data;
   } catch (err) {
@@ -142,6 +144,15 @@ export const advanceRfiStage = async (identifier, stage, actor = 'RA Clinical Sp
 export const getRfiAuditChain = async (identifier) => {
   try {
     const res = await axios.get(`${LAYER2_URL}/rfi/${identifier}/audit`);
+    return res.data;
+  } catch (err) {
+    throw err.response?.data || err;
+  }
+};
+
+export const getRfiEvidenceIntegrity = async (identifier) => {
+  try {
+    const res = await axios.get(`${LAYER2_URL}/rfi/${identifier}/evidence-integrity`);
     return res.data;
   } catch (err) {
     throw err.response?.data || err;
@@ -269,3 +280,13 @@ export const fetchAnalyticsTrends = async (days = 30) => {
     throw err.response?.data || err;
   }
 };
+
+export const fetchAiAnalyticsInsights = async () => {
+  try {
+    const res = await axios.get(`${LAYER1_URL}/analytics/ai-insights`);
+    return res.data;
+  } catch (err) {
+    throw err.response?.data || err;
+  }
+};
+

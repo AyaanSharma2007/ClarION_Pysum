@@ -65,6 +65,8 @@ router = APIRouter(tags=["Search"])
 class RecommendationRequest(BaseModel):
     concern_text: str = Field(..., description="Draft concern text to find similar cases for")
     top_k: int = Field(5, description="Number of recommendations to return")
+    min_similarity: float = Field(0.35, description="Minimum cosine similarity threshold")
+    exclude_consideration_id: Optional[str] = Field(None, description="Consideration ID to exclude (e.g. self)")
 
 class RecommendationResult(BaseModel):
     consideration_id: str
@@ -382,7 +384,13 @@ async def get_recommendations(
         return RecommendationResponse(results=[], query=body.concern_text)
 
     try:
-        results = await recommend_responses(db, body.concern_text, body.top_k)
+        results = await recommend_responses(
+            db,
+            body.concern_text,
+            top_k=body.top_k,
+            min_similarity=body.min_similarity,
+            exclude_consideration_id=body.exclude_consideration_id,
+        )
     except Exception as exc:
         logger.error("Recommender failed: %s", exc)
         raise HTTPException(status_code=500, detail="Recommendation service error")

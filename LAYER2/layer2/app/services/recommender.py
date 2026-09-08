@@ -38,16 +38,19 @@ async def recommend_responses(
     db: AsyncSession,
     concern_text: str,
     top_k: int = 5,
+    min_similarity: float = 0.35,
+    exclude_consideration_id: str | None = None,
 ) -> list[dict[str, Any]]:
     """
     1. Embed query
-    2. Over-fetch top 20 candidates via pgvector
-    3. Calculate success score for each candidate
-    4. Re-rank using 60/40 formula
-    5. Return top_k
+    2. Over-fetch candidates via pgvector
+    3. Exclude self-matches and low-similarity records (< min_similarity)
+    4. Calculate success score for each candidate
+    5. Re-rank using 60/40 formula
+    6. Return top_k
     """
     # Over-fetch for re-ranking
-    fetch_k = max(20, top_k * 3)
+    fetch_k = max(20, top_k * 4)
 
     query_vec = await embedding_service.encode_async(concern_text)
     vec_literal = cast(query_vec, Vector(len(query_vec)))
@@ -64,18 +67,32 @@ async def recommend_responses(
         )
         .where(Consideration.embedding.is_not(None))
         .where(Consideration.consideration_id_str.is_not(None))
-        .order_by(distance_expr)
-        .limit(fetch_k)
     )
+
+    if exclude_consideration_id:
+        stmt = stmt.where(Consideration.consideration_id_str != str(exclude_consideration_id))
+
+    stmt = stmt.order_by(distance_expr).limit(fetch_k)
     rows = (await db.execute(stmt)).all()
 
     if not rows:
         return []
 
-    # 2. Re-rank
+    # 2. Re-rank and filter
+    norm_query = concern_text.strip().lower()
     candidates = []
     for row in rows:
         sim_score = float(row.similarity_score)
+        row_text = (row.concern_text or "").strip().lower()
+
+        # Exclude self matches (exact identical text or cosine similarity >= 0.985)
+        if sim_score >= 0.985 or (norm_query and row_text == norm_query):
+            continue
+
+        # Enforce minimum similarity threshold so unrelated questions are not returned
+        if sim_score < min_similarity:
+            continue
+
         success_score = await get_success_score(row.outcome_status)
         final_score = (sim_score * 0.6) + (success_score * 0.4)
         

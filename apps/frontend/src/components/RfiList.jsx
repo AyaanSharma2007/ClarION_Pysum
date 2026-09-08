@@ -19,10 +19,14 @@ function getSlaInfo(sla_due_at, rfi_type) {
 
 const STAGE_LABELS = {
   received: 'Received',
+  awaiting_response: 'Awaiting Response',
+  drafting: 'Drafting',
+  pending_approval: 'Pending Approval',
+  approved: 'Approved',
+  submitted: 'Submitted',
   RA_Clinical_Review: 'RA Review',
   CTA_Mgmt_Review: 'CTA Review',
   EU_Hub_Approval: 'EU Approval',
-  Submitted: 'Submitted',
 };
 
 const s = {
@@ -99,13 +103,27 @@ const s = {
     alignItems: 'center',
     gap: 4,
   },
-  stagePill: {
-    fontSize: 10,
-    padding: '2px 8px',
-    borderRadius: 20,
-    background: 'var(--accent-blue-light)',
-    color: 'var(--accent-blue)',
-    fontWeight: 500,
+  stagePill: (stage) => {
+    let bg = 'var(--accent-blue-light)';
+    let color = 'var(--accent-blue)';
+    if (stage === 'submitted' || stage === 'Submitted') {
+      bg = 'var(--green-light)';
+      color = 'var(--green)';
+    } else if (stage === 'awaiting_response') {
+      bg = 'var(--amber-light)';
+      color = '#b45309';
+    } else if (stage === 'pending_approval') {
+      bg = 'rgba(240, 98, 146, 0.12)';
+      color = '#e91e63';
+    }
+    return {
+      fontSize: 10,
+      padding: '2px 8px',
+      borderRadius: 20,
+      background: bg,
+      color: color,
+      fontWeight: 600,
+    };
   },
   consCount: {
     fontSize: 11,
@@ -150,13 +168,17 @@ const s = {
   emptyIcon: { fontSize: 36, marginBottom: 12 },
 };
 
-function SlaTimer({ sla_due_at, rfi_type }) {
+function SlaTimer({ sla_due_at, rfi_type, isSubmitted }) {
   const [info, setInfo] = useState(() => getSlaInfo(sla_due_at, rfi_type));
   useEffect(() => {
     setInfo(getSlaInfo(sla_due_at, rfi_type));
     const t = setInterval(() => setInfo(getSlaInfo(sla_due_at, rfi_type)), 30000);
     return () => clearInterval(t);
   }, [sla_due_at, rfi_type]);
+
+  if (isSubmitted) {
+    return <div style={s.slaBadge('var(--green)', 'var(--green-light)')}>✓ Submitted</div>;
+  }
 
   return <div style={s.slaBadge(info.color, info.bg)}>{info.label}</div>;
 }
@@ -178,49 +200,92 @@ export default function RfiList({ rfis, pendingUploads, selectedId, onSelect }) 
       {pendingUploads.map(p => (
         <div key={p.id} style={s.pendingRow}>
           <div style={{ width: 18, height: 18, border: '2.5px solid var(--border)', borderTopColor: 'var(--accent-blue)', borderRadius: '50%', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
-          <div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <div style={s.pendingName}>{p.filename}</div>
             <div style={s.pendingText}>Parsing & ingesting — this may take a moment…</div>
           </div>
         </div>
       ))}
 
-      {rfis.map(rfi => {
+      {rfis.map((rfi, idx) => {
         const sla = getSlaInfo(rfi.workflow_state?.sla_due_at, rfi.rfi_type);
         const stage = rfi.workflow_state?.current_stage || rfi.status || 'received';
         const isSelected = rfi.id === selectedId;
+        const isSubmitted = stage === 'submitted';
+
+        // Check if this is the first submitted RFI after active RFIs
+        const prevStage = idx > 0 ? (rfis[idx - 1].workflow_state?.current_stage || rfis[idx - 1].status || 'received').toLowerCase() : null;
+        const showSubmittedDivider = isSubmitted && prevStage !== null && prevStage !== 'submitted';
 
         return (
-          <div
-            key={rfi.id}
-            id={`rfi-row-${rfi.id}`}
-            style={s.card(isSelected)}
-            onClick={() => onSelect(rfi)}
-            onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; e.currentTarget.style.borderColor = 'var(--border-hover)'; } }}
-            onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.background = 'var(--bg-card)'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; e.currentTarget.style.borderColor = 'var(--border)'; } }}
-          >
-            <div style={s.dot(sla.color)} />
-
-            <div style={s.main}>
-              <div style={s.topRow}>
-                <span style={s.rfiId}>{rfi.rfi_id}</span>
-                {rfi.category && <span style={s.category}>{rfi.category}</span>}
-                <span style={s.indication}>{rfi.therapeutic_area_name || '—'}</span>
+          <React.Fragment key={rfi.id}>
+            {showSubmittedDivider && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                margin: '18px 0 10px',
+                padding: '4px 0',
+              }}>
+                <div style={{ height: 1, flex: 1, background: 'var(--border)' }} />
+                <span style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  color: 'var(--text-dim)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}>
+                  <span style={{ color: 'var(--green)' }}>✓</span> Completed / Submitted RFIs ({rfis.filter(r => (r.workflow_state?.current_stage || r.status || '').toLowerCase() === 'submitted').length})
+                </span>
+                <div style={{ height: 1, flex: 1, background: 'var(--border)' }} />
               </div>
-              <div style={s.bottomRow}>
-                <span style={s.stagePill}>{STAGE_LABELS[stage] || stage}</span>
-                {rfi.considerations?.length > 0 && (
-                  <span style={s.consCount}>
-                    {rfi.considerations.length} consideration{rfi.considerations.length !== 1 ? 's' : ''}
-                  </span>
-                )}
+            )}
+
+            <div
+              id={`rfi-row-${rfi.id}`}
+              style={s.card(isSelected)}
+              onClick={() => onSelect(rfi)}
+              onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; e.currentTarget.style.borderColor = 'var(--border-hover)'; } }}
+              onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.background = 'var(--bg-card)'; e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; e.currentTarget.style.borderColor = 'var(--border)'; } }}
+            >
+              <div style={s.dot(isSubmitted ? 'var(--green)' : sla.color)} />
+
+              <div style={s.main}>
+                <div style={s.topRow}>
+                  <span style={s.rfiId}>{rfi.rfi_id}</span>
+                  {rfi.category && <span style={s.category}>{rfi.category}</span>}
+                  <span style={s.indication}>{rfi.therapeutic_area_name || '—'}</span>
+                </div>
+                <div style={s.bottomRow}>
+                  <span style={s.stagePill(stage)}>{STAGE_LABELS[stage] || stage}</span>
+                  {isSubmitted && (
+                    <span style={{
+                      fontSize: 10,
+                      color: 'var(--green)',
+                      background: 'var(--green-light)',
+                      padding: '2px 7px',
+                      borderRadius: 12,
+                      fontWeight: 600,
+                    }}>
+                      ✓ Response Submitted
+                    </span>
+                  )}
+                  {rfi.considerations?.length > 0 && (
+                    <span style={s.consCount}>
+                      {rfi.considerations.length} consideration{rfi.considerations.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div style={s.slaRight}>
+                <SlaTimer sla_due_at={rfi.workflow_state?.sla_due_at} rfi_type={rfi.rfi_type} isSubmitted={isSubmitted} />
               </div>
             </div>
-
-            <div style={s.slaRight}>
-              <SlaTimer sla_due_at={rfi.workflow_state?.sla_due_at} rfi_type={rfi.rfi_type} />
-            </div>
-          </div>
+          </React.Fragment>
         );
       })}
     </div>

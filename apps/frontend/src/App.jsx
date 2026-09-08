@@ -3,6 +3,7 @@ import FilterBar from './components/FilterBar';
 import RfiList from './components/RfiList';
 import DetailPanel from './components/DetailPanel';
 import AnalyticsDashboard from './components/AnalyticsDashboard';
+import ExecutiveView from './components/ExecutiveView';
 import { fetchAllRfis, parsePdfLayer1, ingestRfiLayer1 } from './services/api';
 
 // CSS animation for slide-in panel
@@ -35,15 +36,54 @@ function useTheme() {
   return [theme, toggle];
 }
 
+const isSubmittedRfi = (r) => {
+  const stage = (r.workflow_state?.current_stage || r.status || '').toLowerCase();
+  return stage === 'submitted';
+};
+
 const SORT_FNS = {
   sla_asc: (a, b) => {
-    const ad = new Date(a.workflow_state?.sla_due_at || 0).getTime();
-    const bd = new Date(b.workflow_state?.sla_due_at || 0).getTime();
-    return ad - bd;
+    const aSub = isSubmittedRfi(a);
+    const bSub = isSubmittedRfi(b);
+    // Active RFIs always appear before submitted RFIs
+    if (!aSub && bSub) return -1;
+    if (aSub && !bSub) return 1;
+
+    // Both are active: least amount of time remaining until deadline is first
+    if (!aSub && !bSub) {
+      const aTime = a.workflow_state?.sla_due_at || a.due_date;
+      const bTime = b.workflow_state?.sla_due_at || b.due_date;
+      const ad = aTime ? new Date(aTime).getTime() : Infinity;
+      const bd = bTime ? new Date(bTime).getTime() : Infinity;
+      return ad - bd;
+    }
+
+    // Both are submitted: most recently submitted / latest response date first
+    const ad = new Date(a.submit_date || a.response_date || a.workflow_state?.sla_due_at || 0).getTime();
+    const bd = new Date(b.submit_date || b.response_date || b.workflow_state?.sla_due_at || 0).getTime();
+    return bd - ad;
   },
-  received_desc: (a, b) => new Date(b.received_at || 0) - new Date(a.received_at || 0),
-  country_asc: (a, b) => (a.nca_country || '').localeCompare(b.nca_country || ''),
-  risk_desc: (a, b) => (b._riskScore || 0) - (a._riskScore || 0),
+  received_desc: (a, b) => {
+    const aSub = isSubmittedRfi(a);
+    const bSub = isSubmittedRfi(b);
+    if (!aSub && bSub) return -1;
+    if (aSub && !bSub) return 1;
+    return new Date(b.received_at || 0) - new Date(a.received_at || 0);
+  },
+  country_asc: (a, b) => {
+    const aSub = isSubmittedRfi(a);
+    const bSub = isSubmittedRfi(b);
+    if (!aSub && bSub) return -1;
+    if (aSub && !bSub) return 1;
+    return (a.nca_country || '').localeCompare(b.nca_country || '');
+  },
+  risk_desc: (a, b) => {
+    const aSub = isSubmittedRfi(a);
+    const bSub = isSubmittedRfi(b);
+    if (!aSub && bSub) return -1;
+    if (aSub && !bSub) return 1;
+    return (b._riskScore || 0) - (a._riskScore || 0);
+  },
 };
 
 const s = {
@@ -194,7 +234,13 @@ export default function App() {
   const loadRfis = useCallback(async () => {
     try {
       const data = await fetchAllRfis();
-      setRfis(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setRfis(list);
+      setSelectedRfi(curr => {
+        if (!curr) return null;
+        const fresh = list.find(item => item.id === curr.id || item.rfi_id === curr.rfi_id);
+        return fresh || curr;
+      });
       setError(null);
     } catch (e) {
       console.error('[App] fetchAllRfis failed:', e);
@@ -261,7 +307,7 @@ export default function App() {
     if (filters.country !== 'all') list = list.filter(r => r.nca_country === filters.country);
 
     // Stage
-    if (filters.stage !== 'all') list = list.filter(r => (r.workflow_state?.current_stage || r.status) === filters.stage);
+    if (filters.stage !== 'all') list = list.filter(r => (r.workflow_state?.current_stage || r.status || '').toLowerCase() === filters.stage.toLowerCase());
 
     // Category
     if (filters.category !== 'all') list = list.filter(r => r.category === filters.category);
@@ -425,6 +471,23 @@ export default function App() {
           >
             📊 Analytics
           </button>
+          <button
+            id="nav-audit-btn"
+            style={{
+              padding: '6px 14px',
+              borderRadius: 'var(--radius-sm)',
+              border: view === 'audit' ? '1px solid var(--accent-blue)' : '1px solid var(--border)',
+              background: view === 'audit' ? 'var(--accent-blue-light)' : 'transparent',
+              color: view === 'audit' ? 'var(--accent-blue)' : 'var(--text-muted)',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+            onClick={() => setView('audit')}
+          >
+            📜 Audit Trail
+          </button>
         </div>
 
         <button
@@ -471,6 +534,10 @@ export default function App() {
       {/* View Content */}
       {view === 'analytics' ? (
         <AnalyticsDashboard onBack={() => setView('repository')} />
+      ) : view === 'audit' ? (
+        <main style={{ flex: 1, width: '100%', padding: '0 28px', minHeight: 0, boxSizing: 'border-box' }}>
+          <ExecutiveView rfis={rfis} />
+        </main>
       ) : (
         <main style={s.main}>
           {error && (
@@ -506,7 +573,10 @@ export default function App() {
         <DetailPanel
           rfi={selectedRfi}
           onClose={() => setSelectedRfi(null)}
-          onStageAdvanced={loadRfis}
+          onStageAdvanced={(updated) => {
+            if (updated) setSelectedRfi(updated);
+            loadRfis();
+          }}
         />
       )}
     </div>

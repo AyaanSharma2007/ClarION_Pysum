@@ -61,6 +61,44 @@ class DraftHistoryResponse(BaseModel):
 class EvaluateDraftRequest(BaseModel):
     draft_text: str
 
+# ── Helper: Fetch similar past responses for RAG context ───────────────────────
+
+async def _fetch_rag_context(concern_text: str, top_k: int = 3) -> List[Dict[str, Any]]:
+    """
+    Query Layer 2's /search/recommend endpoint to retrieve historically
+    successful responses to similar concerns (pgvector cosine similarity +
+    outcome-weighted re-ranking).
+
+    Returns a list of past responses with their similarity scores.
+    Only includes responses that have response_text (i.e., were actually answered).
+    """
+    url = f"{LAYER2_URL}/search/recommend"
+    payload = {
+        "concern_text": concern_text,
+        "top_k": top_k * 2,  # Over-fetch to filter for those with response_text
+        "min_similarity": 0.40,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(url, json=payload)
+            if resp.status_code == 200:
+                data = resp.json()
+                results = data.get("results", [])
+                # Only include entries that have an actual response_text
+                with_responses = [
+                    r for r in results
+                    if r.get("response_text") and len(r["response_text"].strip()) > 10
+                ]
+                logger.info(
+                    "RAG retrieval: found %d similar past responses (%d with response text) for drafting",
+                    len(results), len(with_responses),
+                )
+                return with_responses[:top_k]
+    except Exception as exc:
+        logger.warning("RAG retrieval failed (continuing without RAG context): %s", exc)
+    return []
+
+
 # ── Helper: Call Local Model to draft a response ───────────────────────────────
 
 async def _generate_draft_with_local_model(
@@ -70,7 +108,28 @@ async def _generate_draft_with_local_model(
 ) -> str:
     """
     Call the local Ollama API to generate a regulatory response draft using our fine-tuned Qwen model.
+
+    Uses Retrieval-Augmented Generation (RAG): fetches similar past successful
+    responses from the vector database and injects them into the prompt as
+    exemplars for the LLM to follow.
     """
+    # ── RAG: Fetch similar past successful responses ───────────────────────
+    rag_examples = await _fetch_rag_context(concern_text, top_k=3)
+
+    rag_context = ""
+    if rag_examples:
+        rag_context = "\n\nHistorically successful responses to similar concerns (use these as style and content guides):\n"
+        for i, ex in enumerate(rag_examples, 1):
+            sim = ex.get("similarity_score", 0)
+            outcome = ex.get("outcome_status", "unknown")
+            resp_text = ex.get("response_text", "")[:400]
+            concern = (ex.get("concern_text") or "")[:150]
+            rag_context += (
+                f"\n--- Example {i} (similarity: {sim:.0%}, outcome: {outcome}) ---\n"
+                f"Concern: {concern}\n"
+                f"Accepted Response: {resp_text}\n"
+            )
+
     # Build context from previous drafts
     history_context = ""
     if previous_drafts:
@@ -84,8 +143,15 @@ async def _generate_draft_with_local_model(
     country = rfi_context.get("country", "Unknown")
     indication = rfi_context.get("indication", "Unknown")
 
-    prompt = f"Context: EU CTR Validation RFI\nMSC: {country}\nIndication: {indication}\nConcern: {concern_text}{history_context}"
-    system_prompt = "You are an expert regulatory affairs AI. Draft a professional response for the following EU CTR Validation RFI consideration. Keep it under 50 words."
+    prompt = f"Context: EU CTR Validation RFI\nMSC: {country}\nIndication: {indication}\nConcern: {concern_text}{rag_context}{history_context}"
+
+    system_prompt = (
+        "You are an expert regulatory affairs AI. Draft a professional response for the "
+        "following EU CTR Validation RFI consideration. "
+        "If similar historically accepted responses are provided, use them as style and "
+        "content guides to maximise the acceptance probability of your draft. "
+        "Keep it under 50 words."
+    )
 
     url = f"{OLLAMA_URL}/api/generate"
     payload = {
@@ -99,14 +165,14 @@ async def _generate_draft_with_local_model(
         }
     }
     
-    logger.info("Attempting Ollama API request for model '%s'", OLLAMA_MODEL)
+    logger.info("Attempting Ollama API request for model '%s' (RAG examples: %d)", OLLAMA_MODEL, len(rag_examples))
     resp = None
     last_err_detail = ""
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
             resp = await client.post(url, json=payload)
             if resp.status_code == 200:
-                logger.info("Successfully generated response using model '%s'", OLLAMA_MODEL)
+                logger.info("Successfully generated RAG-augmented response using model '%s'", OLLAMA_MODEL)
             else:
                 last_err_detail = f"Status {resp.status_code}: {resp.text}"
                 logger.warning("Ollama model '%s' returned status %d: %s", OLLAMA_MODEL, resp.status_code, resp.text)
@@ -116,6 +182,14 @@ async def _generate_draft_with_local_model(
 
     if resp is None or resp.status_code != 200:
         logger.warning(f"Failed to get response from Ollama API. Returning fallback template. Details: {last_err_detail}")
+        # Fallback: if RAG examples are available, use the best one as the draft
+        if rag_examples and rag_examples[0].get("response_text"):
+            best = rag_examples[0]["response_text"]
+            sim = rag_examples[0].get("similarity_score", 0)
+            logger.info("Using best RAG example as fallback draft (similarity: %.0f%%)", sim * 100)
+            words = best.split()
+            return " ".join(words[:50]) if len(words) > 50 else best
+
         return (
             f"In response to the authority's concern regarding: \"{concern_text[:200]}...\"\n\n"
             "The sponsor acknowledges this concern and provides the following clarification:\n\n"

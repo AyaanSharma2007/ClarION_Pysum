@@ -106,6 +106,7 @@ class RFICreate(BaseModel):
     # Optional fields added by Layer 1's ownership tagger
     category: Optional[str] = None
     owner_team: Optional[str] = None
+    status: Optional[str] = None
 
 
 class RFIBatchCreate(BaseModel):

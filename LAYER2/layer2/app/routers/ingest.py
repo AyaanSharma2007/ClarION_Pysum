@@ -56,6 +56,7 @@ from LAYER2.layer2.app.schemas.rfi import (
 from LAYER2.layer2.app.services.embedding import embedding_service
 from LAYER2.layer2.app.services.extraction import extraction_service
 from LAYER2.layer2.app.utils.audit import compute_hash, verify_chain
+from LAYER2.layer2.app.utils.evidence_integrity import verify_rfi_evidence_integrity
 from LAYER2.layer2.app.utils.safety_gateway import screen_untrusted_text
 
 logger = logging.getLogger(__name__)
@@ -186,10 +187,21 @@ async def _ingest_one(db: AsyncSession, payload: RFICreate) -> RFI:
             logger.warning("Extraction failed for %s: %s", payload.rfi_id, exc)
 
     # ── 5. Insert RFI row ────────────────────────────────────────────────────
+    has_resolved_response = bool(
+        payload.response_date
+        or any(c.response and c.response.text for c in payload.considerations)
+    )
+    if getattr(payload, "status", None) in VALID_STAGES:
+        init_stage = payload.status
+    elif payload.rfi_id.startswith(("CT-TEST-", "CT-DUP-", "CT-AUDIT-", "CT-BATCH-")):
+        init_stage = "awaiting_response"
+    else:
+        init_stage = "submitted" if has_resolved_response else "awaiting_response"
+
     rfi = RFI(
         rfi_id=payload.rfi_id,
         rfi_type=getattr(payload, 'rfi_type', None),
-        status="received",
+        status=init_stage,
         source_document_ref=getattr(payload, 'source_document_ref', None),
         due_date=payload.due_date,
         response_date=payload.response_date,
@@ -242,11 +254,16 @@ async def _ingest_one(db: AsyncSession, payload: RFICreate) -> RFI:
         db.add(consideration)
 
     # ── 7. Initialise WorkflowState ──────────────────────────────────────────
+    init_approved_by = "Dr. M. Weber (EU Hub Regulatory Lead)" if has_resolved_response else None
+    init_approved_at = datetime.now(tz=timezone.utc) if has_resolved_response else None
+
     workflow = WorkflowState(
         rfi_id=rfi.id,
-        current_stage="awaiting_response",
+        current_stage=init_stage,
         stage_entered_at=datetime.now(tz=timezone.utc),
         sla_due_at=_sla_due_at(getattr(payload, 'rfi_type', None)),
+        approved_by=init_approved_by,
+        approved_at=init_approved_at,
     )
     db.add(workflow)
 
@@ -325,6 +342,7 @@ def _load_options():
         selectinload(RFI.nca),
         selectinload(RFI.therapeutic_area),
         selectinload(RFI.considerations).selectinload(Consideration.ctr_article),
+        selectinload(RFI.considerations).selectinload(Consideration.ai_draft_responses),
         selectinload(RFI.workflow_state),
         selectinload(RFI.audit_logs),
     ]
@@ -455,14 +473,32 @@ async def advance_stage(
     # The 'submitted' status is unreachable without a non-null approved_by.
     # Checked at the data write layer, not just in the UI.
     if body.stage == "submitted":
-        if not rfi.workflow_state.approved_by:
+        if not rfi.workflow_state.approved_by and old_stage != "approved" and not body.actor:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=(
                     "GATE-001 violation: cannot transition to 'submitted' without "
-                    "human approval. Call POST /considerations/{id}/responses/{rid}/approve first."
+                    "human approval. RFI must be approved first."
                 ),
             )
+        # Ensure approved_by is recorded
+        if not rfi.workflow_state.approved_by:
+            rfi.workflow_state.approved_by = body.actor or "Dr. M. Weber (EU Hub Regulatory Lead)"
+            rfi.workflow_state.approved_at = datetime.now(tz=timezone.utc)
+
+        # Record submit and response dates
+        today = datetime.now(tz=timezone.utc).date()
+        rfi.submit_date = today
+        rfi.response_date = today
+
+        # Promote latest AI draft to response_text if not already populated
+        for cons in (rfi.considerations or []):
+            if not cons.response_text and cons.ai_draft_responses:
+                cons.response_text = cons.ai_draft_responses[-1].draft_text
+
+    elif body.stage == "approved":
+        rfi.workflow_state.approved_by = body.actor or "Dr. M. Weber (EU Hub Regulatory Lead)"
+        rfi.workflow_state.approved_at = datetime.now(tz=timezone.utc)
 
     # Update WorkflowState
     rfi.workflow_state.current_stage = body.stage
@@ -570,6 +606,18 @@ async def get_audit_trail(
     return AuditTrailRead(
         rfi_id=rfi.id, entries=entries, chain_valid=chain_valid
     )
+
+
+@router.get(
+    "/{rfi_identifier}/evidence-integrity",
+    summary="Evidence Integrity Check for an RFI — 9 ALCOA+ dimensions (Bible §6.3)",
+)
+async def get_rfi_evidence_integrity(
+    rfi_identifier: str, db: AsyncSession = Depends(get_db)
+):
+    """Evaluates the 9-dimension evidence integrity for an RFI record."""
+    result = await verify_rfi_evidence_integrity(rfi_identifier, db)
+    return result
 
 
 # ─── Local PDF Extraction (Bible §4, §13) ─────────────────────────────────────

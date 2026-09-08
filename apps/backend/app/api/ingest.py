@@ -452,11 +452,17 @@ async def ingest_rfi(payload: RFIExtractionTemplate, background_tasks: Backgroun
 
     if supabase:
         try:
-            supabase.table("rfi_intake").insert(record_to_insert).execute()
-            db_status = "persisted"
-            db_message = "Record written to Supabase Postgres table 'rfi_intake'."
+            existing = supabase.table("rfi_intake").select("id").eq("rfi_id", payload.rfi_id).limit(1).execute()
+            if existing.data and len(existing.data) > 0:
+                supabase.table("rfi_intake").update(record_to_insert).eq("rfi_id", payload.rfi_id).execute()
+                db_status = "updated"
+                db_message = f"Record '{payload.rfi_id}' updated in Supabase table 'rfi_intake'."
+            else:
+                supabase.table("rfi_intake").insert(record_to_insert).execute()
+                db_status = "persisted"
+                db_message = f"Record '{payload.rfi_id}' inserted into Supabase table 'rfi_intake'."
         except Exception as db_err:
-            logger.warning("Supabase insert failed (continuing to Layer 2): %s", db_err)
+            logger.warning("Supabase upsert failed (continuing to Layer 2): %s", db_err)
             db_status = "warning"
             db_message = f"Supabase warning: {str(db_err)}"
 

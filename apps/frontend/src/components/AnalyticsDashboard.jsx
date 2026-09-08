@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, Area, AreaChart,
@@ -8,6 +8,7 @@ import {
   fetchDepartmentMetrics,
   fetchRepeatingTopics,
   fetchAnalyticsTrends,
+  fetchAiAnalyticsInsights,
 } from '../services/api';
 
 // ── Custom Tooltip ───────────────────────────────────────────────────────────
@@ -231,6 +232,7 @@ export default function AnalyticsDashboard({ onBack, showHeader = false }) {
   const [kpis, setKpis] = useState(null);
   const [departments, setDepartments] = useState([]);
   const [topics, setTopics] = useState([]);
+  const [aiInsights, setAiInsights] = useState(null);
   const [trends, setTrends] = useState([]);
   const [trendDays, setTrendDays] = useState(30);
   const [loading, setLoading] = useState(true);
@@ -243,21 +245,40 @@ export default function AnalyticsDashboard({ onBack, showHeader = false }) {
     return () => mediaQuery.removeEventListener('change', handler);
   }, []);
 
+  // Ensure unique topic clusters (deduplicate by connected RFI IDs or normalized summary)
+  const uniqueTopics = useMemo(() => {
+    const seen = new Set();
+    const result = [];
+    for (const t of topics) {
+      const key = (t.similar_rfi_ids && t.similar_rfi_ids.length > 0)
+        ? [...t.similar_rfi_ids].sort().join(',')
+        : (t.summary || '').trim().toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      result.push(t);
+    }
+    return result;
+  }, [topics]);
+
   const loadAll = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [kpiData, deptData, topicData, trendData] = await Promise.allSettled([
+      const [kpiData, deptData, topicData, trendData, aiData] = await Promise.allSettled([
         fetchAnalyticsKpis(),
         fetchDepartmentMetrics(),
         fetchRepeatingTopics(20),
         fetchAnalyticsTrends(trendDays),
+        fetchAiAnalyticsInsights(),
       ]);
 
       if (kpiData.status === 'fulfilled') setKpis(kpiData.value);
       if (deptData.status === 'fulfilled') setDepartments(deptData.value?.departments || []);
-      if (topicData.status === 'fulfilled') setTopics(topicData.value?.topics || []);
+      if (topicData.status === 'fulfilled') {
+        setTopics(topicData.value?.topics || []);
+      }
       if (trendData.status === 'fulfilled') setTrends(trendData.value?.trends || []);
+      if (aiData.status === 'fulfilled') setAiInsights(aiData.value);
     } catch (e) {
       setError('Failed to load analytics data. Ensure the backend is running.');
     } finally {
@@ -405,6 +426,77 @@ export default function AnalyticsDashboard({ onBack, showHeader = false }) {
           </div>
         </div>
 
+        {/* ── AI Executive Intelligence & Root Cause Analysis ────────────── */}
+        {aiInsights && (
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(79, 114, 255, 0.08) 0%, rgba(240, 98, 146, 0.05) 100%)',
+            border: '1px solid rgba(79, 114, 255, 0.25)',
+            borderRadius: 'var(--radius-md)',
+            padding: '22px 24px',
+            marginBottom: 28,
+            boxShadow: 'var(--shadow-sm)',
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 14,
+            }}>
+              <span style={{ fontSize: 18 }}>✨</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', letterSpacing: '-0.01em' }}>
+                AI Executive Root Cause & Risk Intelligence
+              </span>
+            </div>
+
+            <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6, margin: '0 0 14px' }}>
+              {aiInsights.executive_summary}
+            </p>
+
+            {aiInsights.department_risk && (
+              <div style={{
+                fontSize: 12,
+                color: '#b45309',
+                background: 'rgba(245, 158, 11, 0.1)',
+                padding: '10px 14px',
+                borderRadius: 8,
+                marginBottom: 16,
+                borderLeft: '3px solid #f59e0b',
+                lineHeight: 1.5,
+              }}>
+                <strong>Operational Bottleneck:</strong> {aiInsights.department_risk}
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : '1fr 1fr', gap: 16 }}>
+              {aiInsights.root_causes && aiInsights.root_causes.length > 0 && (
+                <div style={{ background: 'var(--bg-card)', padding: '14px 16px', borderRadius: 8, border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: 8, letterSpacing: '0.04em' }}>
+                    Identified Root Causes
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                    {aiInsights.root_causes.map((c, i) => (
+                      <li key={i} style={{ marginBottom: 4 }}>{c}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {aiInsights.recommendations && aiInsights.recommendations.length > 0 && (
+                <div style={{ background: 'var(--bg-card)', padding: '14px 16px', borderRadius: 8, border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: 8, letterSpacing: '0.04em' }}>
+                    Recommended Mitigations
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                    {aiInsights.recommendations.map((r, i) => (
+                      <li key={i} style={{ marginBottom: 4 }}>{r}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── Charts Row ─────────────────────────────────────────────────── */}
         <div style={{
           ...s.chartRow,
@@ -508,8 +600,10 @@ export default function AnalyticsDashboard({ onBack, showHeader = false }) {
 
         {/* ── Repeating Topics Table ─────────────────────────────────────── */}
         <div style={s.tableCard}>
-          <div style={s.chartTitle}>Top Repeating Questions</div>
-          {topics.length > 0 ? (
+          <div style={{ marginBottom: 16 }}>
+            <div style={s.chartTitle}>Top Repeating Questions</div>
+          </div>
+          {uniqueTopics.length > 0 ? (
             <div style={{ overflowX: 'auto' }}>
               <table style={s.table}>
                 <thead>
@@ -522,7 +616,7 @@ export default function AnalyticsDashboard({ onBack, showHeader = false }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {topics.map((topic, i) => (
+                  {uniqueTopics.map((topic, i) => (
                     <tr
                       key={i}
                       style={{ transition: 'background 0.15s' }}
@@ -530,16 +624,26 @@ export default function AnalyticsDashboard({ onBack, showHeader = false }) {
                       onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                     >
                       <td style={{ ...s.td, color: 'var(--text-dim)', fontWeight: 600, width: 40 }}>{i + 1}</td>
-                      <td style={{ ...s.td, maxWidth: 400 }}>
+                      <td style={{ ...s.td, maxWidth: 450 }}>
                         <div style={{ fontWeight: 500, lineHeight: 1.4 }}>{topic.summary}</div>
+                        {topic.similar_rfi_ids && topic.similar_rfi_ids.length > 0 && (
+                          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 5, display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>Identified in {topic.similar_rfi_ids.length} RFIs:</span>
+                            {topic.similar_rfi_ids.map(id => (
+                              <span key={id} style={{ background: 'var(--bg)', padding: '1px 6px', borderRadius: 4, border: '1px solid var(--border)', fontFamily: 'monospace', fontSize: 10 }}>
+                                {id}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </td>
                       <td style={s.td}>
                         <span style={s.badge('amber')}>{topic.department}</span>
                       </td>
-                      <td style={{ ...s.td, fontWeight: 700, color: PINK }}>
+                      <td style={{ ...s.td, fontWeight: 700, color: PINK, whiteSpace: 'nowrap' }}>
                         {topic.frequency}×
                       </td>
-                      <td style={{ ...s.td, color: 'var(--text-muted)' }}>
+                      <td style={{ ...s.td, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                         {topic.avg_similarity
                           ? `${(topic.avg_similarity * 100).toFixed(0)}%`
                           : '—'}

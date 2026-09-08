@@ -200,7 +200,11 @@ class FeatureSchemaResponse(BaseModel):
 
 class RetrainResponse(BaseModel):
     status: str
-    n_samples: int
+    n_samples: Optional[int] = None
+    total_rfis_fetched: Optional[int] = None
+    completed_rfis_used: Optional[int] = None
+    synthetic_supplement: Optional[int] = None
+    total_training_rows: Optional[int] = None
     model_path: str
     categories: list
 
@@ -299,20 +303,34 @@ async def get_risk_feature_schema() -> FeatureSchemaResponse:
 @router.post(
     "/retrain",
     response_model=RetrainResponse,
-    summary="Force-retrain the risk model (dev/admin only)",
+    summary="Retrain risk model from real database data (continuous learning)",
     description=(
-        "Drops the persisted model artefacts and retrains from a fresh synthetic "
-        "calibration dataset. Intended for development cycles or after incorporating "
-        "new labeled data. "
+        "Fetches all completed RFIs from Layer 2, extracts structural features "
+        "and ground-truth labels, supplements with synthetic calibration data, "
+        "and retrains the GradientBoostingClassifier + SHAP explainers. "
+        "\n\n"
+        "The model improves as more RFIs are ingested and resolved in the system. "
         "\n\n"
         "⚠️ This endpoint should be protected by an admin auth guard in production. "
         "In the prototype it is left open for hackathon demo convenience."
     ),
 )
-async def trigger_retrain(n_samples: int = 2000) -> RetrainResponse:
-    """Force-retrain and reload the GBC + SHAP explainers."""
+async def trigger_retrain(use_real_data: bool = True) -> RetrainResponse:
+    """
+    Retrain the GBC + SHAP explainers.
+    
+    If use_real_data=True (default), fetches completed RFIs from Layer 2
+    and trains on real + synthetic data (continuous learning).
+    If use_real_data=False, trains on synthetic data only (legacy behavior).
+    """
     try:
-        result = retrain_model(n_samples=n_samples)
+        if use_real_data:
+            from scripts.retrain_risk_model import retrain as retrain_from_db
+            result = retrain_from_db()
+            # Reload the model singletons in-process
+            retrain_model(n_samples=0)  # Forces reload from disk
+        else:
+            result = retrain_model(n_samples=2000)
         return RetrainResponse(**result)
     except Exception as exc:
         logger.error("Clarion Layer 4: Retraining failed — %s", exc, exc_info=True)
