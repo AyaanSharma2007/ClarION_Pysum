@@ -452,6 +452,34 @@ async def ingest_rfi(payload: RFIExtractionTemplate, background_tasks: Backgroun
     db_status = "persisted"
     db_message = "Record written to Supabase Postgres table 'rfi_intake'."
 
+    # ── Analytics Enrichment (Background) ──────────────────────────────────
+    # Triggers: Qwen JSON extraction → embedding → pgvector similarity →
+    # Neo4j Department/Category/IS_SIMILAR_TO relationships.
+    # Runs as a background task so the ingest response stays fast.
+    concern_texts = [
+        c.concern_text for c in payload.considerations
+        if c.concern_text
+    ]
+    if concern_texts:
+        async def _run_analytics_enrichment():
+            try:
+                from apps.backend.app.analytics_enrichment import enrich_rfi_analytics
+                analytics_result = await enrich_rfi_analytics(
+                    rfi_id=payload.rfi_id,
+                    concern_texts=concern_texts,
+                    supabase_client=supabase,
+                )
+                logger.info(
+                    "Analytics enrichment complete for %s: duplicate=%s, similar_count=%d",
+                    payload.rfi_id,
+                    analytics_result.get("is_duplicate"),
+                    analytics_result.get("similar_count", 0),
+                )
+            except Exception as e:
+                logger.warning("Analytics enrichment failed for %s: %s", payload.rfi_id, e)
+
+        background_tasks.add_task(_run_analytics_enrichment)
+
     # ── Forward to Layer 2 Central Repository ──────────────────────────────
     # Layer 2 stores the record in pgvector with per-consideration embeddings,
     # creates a tamper-evident audit chain, and makes the record searchable

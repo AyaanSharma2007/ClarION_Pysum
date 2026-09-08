@@ -75,6 +75,7 @@ const TABS = [
   { id: 'risk_engine',     label: 'Risk Engine' },
   { id: 'medical_writing', label: 'Search' },
   { id: 'executive',       label: 'Audit' },
+  { id: 'analytics',       label: 'Analytics' },
 ];
 
 export default function Header({ activeRole, setActiveRole, systemHealth, onOpenDemo }) {

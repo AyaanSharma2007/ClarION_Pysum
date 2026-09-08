@@ -218,3 +218,45 @@ export const getDraftHistory = async (considerationId) => {
     throw err.response?.data || err;
   }
 };
+
+// ── Analytics Dashboard API calls ──────────────────────────────────────────
+
+export const fetchAnalyticsKpis = async () => {
+  try {
+    const res = await axios.get(`${LAYER1_URL}/analytics/kpis`);
+    return res.data;
+  } catch (err) {
+    throw err.response?.data || err;
+  }
+};
+
+export const fetchDepartmentMetrics = async () => {
+  try {
+    const res = await axios.get(`${LAYER1_URL}/analytics/department-metrics`);
+    return res.data;
+  } catch (err) {
+    throw err.response?.data || err;
+  }
+};
+
+export const fetchRepeatingTopics = async (limit = 20) => {
+  try {
+    const res = await axios.get(`${LAYER1_URL}/analytics/repeating-topics`, {
+      params: { limit },
+    });
+    return res.data;
+  } catch (err) {
+    throw err.response?.data || err;
+  }
+};
+
+export const fetchAnalyticsTrends = async (days = 30) => {
+  try {
+    const res = await axios.get(`${LAYER1_URL}/analytics/trends`, {
+      params: { days },
+    });
+    return res.data;
+  } catch (err) {
+    throw err.response?.data || err;
+  }
+};

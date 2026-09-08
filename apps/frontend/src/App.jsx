@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import FilterBar from './components/FilterBar';
 import RfiList from './components/RfiList';
 import DetailPanel from './components/DetailPanel';
+import AnalyticsDashboard from './components/AnalyticsDashboard';
 import { fetchAllRfis, parsePdfLayer1, ingestRfiLayer1 } from './services/api';
 
 // CSS animation for slide-in panel
@@ -161,6 +162,7 @@ const s = {
 
 export default function App() {
   const [theme, toggleTheme] = useTheme();
+  const [view, setView] = useState('repository');
   const [rfis, setRfis] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -387,6 +389,44 @@ export default function App() {
           </div>
         </div>
 
+        {/* View Switcher Tabs in Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 12 }}>
+          <button
+            id="nav-repository-btn"
+            style={{
+              padding: '6px 14px',
+              borderRadius: 'var(--radius-sm)',
+              border: view === 'repository' ? '1px solid var(--accent-blue)' : '1px solid var(--border)',
+              background: view === 'repository' ? 'var(--accent-blue-light)' : 'transparent',
+              color: view === 'repository' ? 'var(--accent-blue)' : 'var(--text-muted)',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+            onClick={() => setView('repository')}
+          >
+            📋 RFIs Repository
+          </button>
+          <button
+            id="nav-analytics-btn"
+            style={{
+              padding: '6px 14px',
+              borderRadius: 'var(--radius-sm)',
+              border: view === 'analytics' ? '1px solid var(--accent-blue)' : '1px solid var(--border)',
+              background: view === 'analytics' ? 'var(--accent-blue-light)' : 'transparent',
+              color: view === 'analytics' ? 'var(--accent-blue)' : 'var(--text-muted)',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+            onClick={() => setView('analytics')}
+          >
+            📊 Analytics
+          </button>
+        </div>
+
         <button
           id="theme-toggle-btn"
           style={s.refreshBtn}
@@ -428,37 +468,41 @@ export default function App() {
         </button>
       </header>
 
-      {/* Main Content */}
-      <main style={s.main}>
-        {error && (
-          <div style={s.errorBanner}>
-            <span></span> {error}
-          </div>
-        )}
+      {/* View Content */}
+      {view === 'analytics' ? (
+        <AnalyticsDashboard onBack={() => setView('repository')} />
+      ) : (
+        <main style={s.main}>
+          {error && (
+            <div style={s.errorBanner}>
+              <span>⚠️</span> {error}
+            </div>
+          )}
 
-        <FilterBar
-          filters={filters}
-          setFilters={setFilters}
-          countries={countries}
-          resultCount={displayRfis.length}
-        />
-
-        {loading ? (
-          <div style={s.loadingRow}>
-            <span style={{ fontSize: 22, animation: 'spin 1.2s linear infinite', display: 'inline-block' }}></span>
-            Loading RFIs…
-          </div>
-        ) : (
-          <RfiList
-            rfis={displayRfis}
-            pendingUploads={pendingUploads}
-            selectedId={selectedRfi?.id}
-            onSelect={setSelectedRfi}
+          <FilterBar
+            filters={filters}
+            setFilters={setFilters}
+            countries={countries}
+            resultCount={displayRfis.length}
           />
-        )}
-      </main>
 
-      {selectedRfi && (
+          {loading ? (
+            <div style={s.loadingRow}>
+              <span style={{ fontSize: 22, animation: 'spin 1.2s linear infinite', display: 'inline-block' }}>⟳</span>
+              Loading RFIs…
+            </div>
+          ) : (
+            <RfiList
+              rfis={displayRfis}
+              pendingUploads={pendingUploads}
+              selectedId={selectedRfi?.id}
+              onSelect={setSelectedRfi}
+            />
+          )}
+        </main>
+      )}
+
+      {selectedRfi && view === 'repository' && (
         <DetailPanel
           rfi={selectedRfi}
           onClose={() => setSelectedRfi(null)}
