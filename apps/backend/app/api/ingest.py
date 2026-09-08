@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import base64
+import asyncio
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, BackgroundTasks, UploadFile, File, HTTPException, Request, status
@@ -185,8 +186,8 @@ Return ONLY raw valid JSON, wrapped inside a JSON code block. No explanations or
                     {
                         "parts": [
                             {
-                                "inline_data": {
-                                    "mime_type": "application/pdf",
+                                "inlineData": {
+                                    "mimeType": "application/pdf",
                                     "data": base64_pdf
                                 }
                             },
@@ -197,7 +198,7 @@ Return ONLY raw valid JSON, wrapped inside a JSON code block. No explanations or
                     }
                 ],
                 "generationConfig": {
-                    "response_mime_type": "application/json"
+                    "responseMimeType": "application/json"
                 }
             }
 
@@ -212,17 +213,30 @@ Return ONLY raw valid JSON, wrapped inside a JSON code block. No explanations or
             models_to_try = [m for m in gemini_models if not (m in seen or seen.add(m))]
 
             resp = None
+            max_retries = 3
+            
             for model_name in models_to_try:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
-                async with httpx.AsyncClient(timeout=60.0) as client:
-                    resp = await client.post(url, json=payload)
-                    if resp.status_code == 200:
-                        break
-                    elif resp.status_code == 404:
-                        logger.warning("Model %s returned 404. Trying next model...", model_name)
-                        continue
-                    else:
-                        break
+                
+                success = False
+                for attempt in range(max_retries):
+                    async with httpx.AsyncClient(timeout=60.0) as client:
+                        resp = await client.post(url, json=payload)
+                        if resp.status_code == 200:
+                            success = True
+                            break
+                        elif resp.status_code == 429:
+                            logger.warning(f"Rate limited (429) on model {model_name}. Retrying in {2 ** attempt} seconds...")
+                            await asyncio.sleep(2 ** attempt)
+                            continue
+                        elif resp.status_code == 404:
+                            logger.warning("Model %s returned 404. Trying next model...", model_name)
+                            break
+                        else:
+                            break # Other error, give up on this model (e.g. 400 Invalid Argument)
+                            
+                if success:
+                    break
 
             if resp is None or resp.status_code != 200:
                 if resp and resp.status_code == 400 and "API_KEY_INVALID" in resp.text:
