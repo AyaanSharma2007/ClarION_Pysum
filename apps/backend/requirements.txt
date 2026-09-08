@@ -21,3 +21,6 @@ numpy>=1.26.0            # Feature array construction
 joblib>=1.3.0            # Model artefact persistence / reload
 pytest>=8.0.0            # Test suite for Layer 4 invariants
 pymupdf>=1.23.0          # Local PDF text extraction
+
+# Analytics — Embedding generation (all-MiniLM-L6-v2 for 384-dim vectors)
+sentence-transformers>=2.2.0

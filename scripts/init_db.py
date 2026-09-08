@@ -23,8 +23,10 @@ def main():
         
     cur = conn.cursor()
 
-    print("Creating rfi_intake staging table...")
+    print("Creating rfi_intake staging table and enabling vector extension...")
     cur.execute('''
+    CREATE EXTENSION IF NOT EXISTS vector;
+
     CREATE TABLE IF NOT EXISTS rfi_intake (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         rfi_id TEXT NOT NULL,
@@ -37,8 +39,55 @@ def main():
         ingested_at TIMESTAMPTZ DEFAULT NOW(),
         owner_team TEXT,
         validation_status TEXT,
+        department TEXT,
+        category TEXT,
+        urgency TEXT,
+        summary TEXT,
+        is_duplicate BOOLEAN DEFAULT FALSE,
+        resolved_at TIMESTAMPTZ,
+        embedding vector(384),
         created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    ALTER TABLE rfi_intake ADD COLUMN IF NOT EXISTS department TEXT;
+    ALTER TABLE rfi_intake ADD COLUMN IF NOT EXISTS category TEXT;
+    ALTER TABLE rfi_intake ADD COLUMN IF NOT EXISTS urgency TEXT;
+    ALTER TABLE rfi_intake ADD COLUMN IF NOT EXISTS summary TEXT;
+    ALTER TABLE rfi_intake ADD COLUMN IF NOT EXISTS is_duplicate BOOLEAN DEFAULT FALSE;
+    ALTER TABLE rfi_intake ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMPTZ;
+    ALTER TABLE rfi_intake ADD COLUMN IF NOT EXISTS embedding vector(384);
+
+    CREATE OR REPLACE FUNCTION match_rfis(
+      query_embedding vector(384),
+      similarity_threshold float DEFAULT 0.85,
+      match_count int DEFAULT 10
     )
+    RETURNS TABLE (
+      rfi_id TEXT,
+      department TEXT,
+      category TEXT,
+      urgency TEXT,
+      summary TEXT,
+      similarity float
+    )
+    LANGUAGE plpgsql
+    AS $$
+    BEGIN
+      RETURN QUERY
+      SELECT
+        ri.rfi_id,
+        ri.department,
+        ri.category,
+        ri.urgency,
+        ri.summary,
+        1 - (ri.embedding <=> query_embedding) AS similarity
+      FROM rfi_intake ri
+      WHERE ri.embedding IS NOT NULL
+        AND 1 - (ri.embedding <=> query_embedding) > similarity_threshold
+      ORDER BY ri.embedding <=> query_embedding
+      LIMIT match_count;
+    END;
+    $$;
     ''')
 
     print("Granting permissions for Supabase anon/authenticated roles...")
