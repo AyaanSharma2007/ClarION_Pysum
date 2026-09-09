@@ -5,10 +5,10 @@ import sys
 
 def main():
     # Load environment variables from Layer 2
-    load_dotenv(dotenv_path="LAYER2/layer2/.env")
+    load_dotenv(dotenv_path="layer2/.env")
     db_url = os.environ.get('DATABASE_URL')
     if not db_url:
-        print("DATABASE_URL not found in LAYER2/layer2/.env. Skipping DB init.")
+        print("DATABASE_URL not found in layer2/.env. Skipping DB init.")
         sys.exit(0)
         
     # Alembic handles the ORM tables, but we need to create the Layer 1 staging table

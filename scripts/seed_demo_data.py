@@ -13,7 +13,7 @@ except ImportError:
     print("Warning: Could not import load_rfi or neo4j. Make sure you are in the correct virtual environment.")
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
-load_dotenv(os.path.join(os.path.dirname(__file__), "..", "LAYER2", "layer2", ".env"))
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", "layer2", ".env"))
 
 def generate_mock_data():
     records = []

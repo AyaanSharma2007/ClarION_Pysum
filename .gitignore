@@ -8,20 +8,24 @@ yarn-error.log*
 dist/
 build/
 
-# Python / Backend
+# Python & Virtualenv
 __pycache__/
 *.py[cod]
 *$py.class
 venv/
 .venv/
-# .env
+.pytest_cache/
+*.egg-info/
+.coverage
+htmlcov/
 
 # Environment & OS
-# .env.local
-# .env.development.local
-# .env.test.local
-# .env.production.local
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 .DS_Store
 
-# Models
-apps/backend/models/
+# Temporary & Cache
+*.log

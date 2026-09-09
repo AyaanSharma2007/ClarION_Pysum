@@ -10,36 +10,40 @@ Monorepo workspace for **RFI Nexus Data Mesh Intake** — an automated system fo
 ClarION_Pysum/
 ├── package.json           # Root monorepo workspace configuration
 ├── README.md              # Project documentation & guidelines
-├── load_rfi.py            # Layer 3: Neo4j Graph Database Loader Script
-├── validate_rfi_json.py   # Pre-load JSON schema & naming consistency validator
-├── analyze_patterns.py    # Graph pattern analysis & Louvain community detection
+├── requirements.txt       # Shared workspace requirements
+├── pyrightconfig.json     # Type checking configuration
+├── opa                    # Local OPA policy evaluation binary
+├── conftest.py            # Root pytest configuration
 ├── schemas/               # Shared JSON Schema definitions for RFI intake
 │   ├── rfi_extraction_schema.json
 │   └── rfi_extraction_example.json
 ├── apps/
-│   ├── backend/           # Layer 1: Data Mesh Intake API (FastAPI - Port 8000)
+│   ├── backend/           # Layer 1 Data Mesh Intake API & Layer 4 ML Risk Engine (Port 8000)
 │   │   ├── main.py        # FastAPI application & entrypoint
-│   │   ├── requirements.txt # Dependencies: fastapi, uvicorn, pydantic, anthropic, supabase, httpx
-│   │   ├── README.md
-│   │   └── .env.example
+│   │   ├── models.py      # Pydantic v2 schemas
+│   │   ├── load_rfi.py    # Layer 3 Neo4j Graph Loader
+│   │   ├── analyze_patterns.py # Graph pattern analysis & Louvain community detection
+│   │   ├── dataset/       # Synthetic datasets & PDF test files
+│   │   ├── model_artifacts/ # ML risk model & SHAP explainers (.joblib)
+│   │   ├── notebooks/     # Fine-tuning & training notebooks (.ipynb)
+│   │   ├── policies/      # Rego policy definitions
+│   │   ├── scripts/       # Training dataset generator & Modelfile
+│   │   └── requirements.txt
 │   └── frontend/          # React + Vite Application (Port 5173)
-│       ├── package.json   # Dependencies: lucide-react, axios, react-hook-form, tailwindcss
-│       ├── vite.config.js # Vite + Tailwind CSS configuration
-│       └── src/
-│           ├── App.jsx    # Interactive RFI Intake Portal component
-│           └── IngestionDashboard.tsx # RFI ingestion dashboard
-└── LAYER2/
-    └── layer2/            # Layer 2: Central Repository (FastAPI - Port 8001)
-        ├── alembic/       # PostgreSQL + pgvector database migrations
-        ├── app/
-        │   ├── main.py    # Central Repository API entrypoint
-        │   ├── config.py  # Configuration & environment settings
-        │   ├── database.py# Async SQLAlchemy database session engine
-        │   ├── models/    # RFI, Consideration, and Audit Log ORM models
-        │   ├── routers/   # Ingest & Search (Semantic & Hybrid Vector Search)
-        │   └── services/  # SentenceTransformers (all-MiniLM-L6-v2) & Neo4j driver
-        ├── tests/         # Pytest integration & unit test suite
-        └── docker-compose.yml # PostgreSQL + pgvector container definition
+│       ├── package.json
+│       ├── vite.config.js
+│       └── src/           # Interactive RFI Intake Portal & Dashboard
+├── layer2/                # Layer 2 Central Repository API (FastAPI - Port 8001)
+│   ├── alembic/           # PostgreSQL + pgvector database migrations
+│   ├── app/               # Central Repository API implementation
+│   ├── policy/            # Layer 2 Rego policies
+│   ├── tests/             # Layer 2 integration & unit test suite
+│   ├── alembic.ini
+│   ├── docker-compose.yml
+│   └── pyproject.toml
+├── scripts/               # Utility, seeding, presentation & helper scripts
+├── tests/                 # End-to-end test suite (test_e2e.py)
+└── docs/                  # System documentation, specifications, & assets
 ```
 
 ---
@@ -57,15 +61,16 @@ ClarION_Pysum/
 
 ### 1. Root Workspace Commands
 From the repository root:
+- **Run All Services**: `npm run dev`
 - **Run Frontend**: `npm run dev:frontend`
 - **Run Layer 1 Backend**: `npm run dev:backend` (runs on port 8000)
 - **Run Layer 2 Repository**: `npm run dev:layer2` (runs on port 8001)
 
 ### 2. Service Startup Steps
 
-#### Layer 2 Database & Service (`LAYER2/layer2`)
+#### Layer 2 Database & Service (`layer2`)
 ```bash
-cd LAYER2/layer2
+cd layer2
 docker compose up -d
 alembic upgrade head
 uvicorn app.main:app --reload --port 8001

@@ -5,17 +5,17 @@ from dotenv import load_dotenv
 
 # Load env vars first
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
-load_dotenv(os.path.join(os.path.dirname(__file__), "..", "LAYER2", "layer2", ".env"))
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", "layer2", ".env"))
 
 # Import from Layer 2
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "LAYER2", "layer2"))
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "layer2"))
 try:
     from app.config import settings
     from app.models.rfi import Consideration
     from sqlalchemy import select
     from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 except ImportError:
-    print("Warning: Could not import LAYER2 modules. Ensure you are in the correct virtual environment.")
+    print("Warning: Could not import layer2 modules. Ensure you are in the correct virtual environment.")
 
 try:
     from neo4j import GraphDatabase

@@ -9,7 +9,7 @@ from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 
 # Load env vars from Layer 2
-load_dotenv(dotenv_path="LAYER2/layer2/.env")
+load_dotenv(dotenv_path="layer2/.env")
 load_dotenv(dotenv_path="apps/backend/.env")
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
