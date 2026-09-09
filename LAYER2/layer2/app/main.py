@@ -98,6 +98,7 @@ app.include_router(consideration_api.router)
 
 # ── Health check ──────────────────────────────────────────────────────────────
 @app.get("/health", tags=["Meta"], summary="Health check")
+@app.get("/api/health", tags=["Meta"], summary="Health check alias")
 async def health():
     return {
         "status": "ok",

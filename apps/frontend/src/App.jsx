@@ -231,7 +231,9 @@ export default function App() {
     icf: '',
   });
 
-  const loadRfis = useCallback(async () => {
+  const retryCountRef = useRef(0);
+
+  const loadRfis = useCallback(async (isInitial = false) => {
     try {
       const data = await fetchAllRfis();
       const list = Array.isArray(data) ? data : [];
@@ -242,8 +244,15 @@ export default function App() {
         return fresh || curr;
       });
       setError(null);
+      retryCountRef.current = 0;
     } catch (e) {
       console.error('[App] fetchAllRfis failed:', e);
+      if (isInitial && retryCountRef.current < 4) {
+        retryCountRef.current += 1;
+        // Backend services might still be booting up; retry shortly before presenting error
+        setTimeout(() => loadRfis(true), 1500 * retryCountRef.current);
+        return;
+      }
       setError('Could not reach Layer 2 (localhost:8001). Make sure the server is running.');
     } finally {
       setLoading(false);
@@ -251,8 +260,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    loadRfis();
-    const t = setInterval(loadRfis, 30000);
+    loadRfis(true);
+    const t = setInterval(() => loadRfis(false), 30000);
     return () => clearInterval(t);
   }, [loadRfis]);
 
@@ -542,7 +551,22 @@ export default function App() {
         <main style={s.main}>
           {error && (
             <div style={s.errorBanner}>
-              <span>⚠️</span> {error}
+              <span>⚠️</span>
+              <span style={{ flex: 1 }}>{error}</span>
+              <button
+                onClick={() => { setLoading(true); setError(null); loadRfis(true); }}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid currentColor',
+                  borderRadius: 4,
+                  padding: '3px 10px',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  color: 'inherit',
+                }}
+              >
+                Retry
+              </button>
             </div>
           )}
 

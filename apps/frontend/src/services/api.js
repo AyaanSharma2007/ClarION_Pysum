@@ -19,7 +19,9 @@ export const checkSystemHealth = async () => {
   }
 
   try {
-    const l2Res = await axios.get(`${LAYER2_URL}/api/health`, { timeout: 3000 });
+    const l2Res = await axios.get(`${LAYER2_URL}/health`, { timeout: 3000 }).catch(() =>
+      axios.get(`${LAYER2_URL}/api/health`, { timeout: 3000 })
+    );
     results.layer2 = l2Res.status === 200;
   } catch (e) {
     results.layer2 = false;

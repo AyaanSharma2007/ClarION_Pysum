@@ -21,7 +21,6 @@ echo "📥 Checking Python requirements..."
 # 3. Install Node.js dependencies
 echo "📦 Checking npm dependencies..."
 npm install --quiet
-npm install --prefix apps/frontend --quiet
 
 # 4. Initialize Database Schema
 echo "🗄️ Initializing Database schema..."
@@ -35,8 +34,8 @@ fi
 # 5. Pull Ollama Model
 echo "🦙 Checking Ollama for local LLM extraction..."
 if command -v ollama &> /dev/null; then
-    echo "📥 Pulling local qwen2.5:1.5b model..."
-    ollama pull qwen2.5:1.5b
+    echo "📥 Checking local qwen2.5:1.5b model..."
+    ollama pull qwen2.5:1.5b || echo "⚠️ Could not pull Ollama model automatically. Make sure Ollama daemon is running ('ollama serve') if using local extraction."
 else
     echo "⚠️ Ollama is not installed! You will need to install Ollama from https://ollama.com to use the local PDF parser."
 fi

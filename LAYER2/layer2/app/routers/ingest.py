@@ -342,9 +342,7 @@ def _load_options():
         selectinload(RFI.nca),
         selectinload(RFI.therapeutic_area),
         selectinload(RFI.considerations).selectinload(Consideration.ctr_article),
-        selectinload(RFI.considerations).selectinload(Consideration.ai_draft_responses),
         selectinload(RFI.workflow_state),
-        selectinload(RFI.audit_logs),
     ]
 
 

@@ -46,8 +46,11 @@ class EmbeddingService:
                 logger.info(
                     "Loading sentence-transformers model: %s", settings.EMBEDDING_MODEL
                 )
-                # SentenceTransformer() is synchronous — acceptable at startup.
-                self._model = SentenceTransformer(settings.EMBEDDING_MODEL)
+                # Try loading from local cache first for instant sub-second startup
+                try:
+                    self._model = SentenceTransformer(settings.EMBEDDING_MODEL, local_files_only=True)
+                except Exception:
+                    self._model = SentenceTransformer(settings.EMBEDDING_MODEL)
                 logger.info("Embedding model ready (dim=%d).", settings.EMBEDDING_DIMENSION)
             except ImportError:
                 logger.warning(
